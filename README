@@ -1,0 +1,8 @@
+Implementation of well known trick-taking card game Preference.
+To compile it you need to install cmake, gtkmm, boost and librsvg.
+After installing those packages run "cmake . && make". Then you can run ./runPref.sh and enjoy playing :).
+You also may run "make install" to install the game. 
+Any suggestions and bugs are welcomed! So don't hesitate to report them on my email.
+
+Happy playing!
+

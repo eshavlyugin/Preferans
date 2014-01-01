@@ -1,0 +1,3 @@
+#define PREF_MAJOR_VERSION @Preferans_VERSION_MAJOR@
+#define PREF_MINOR_VERSION @Preferans_VERSION_MINOR@
+
