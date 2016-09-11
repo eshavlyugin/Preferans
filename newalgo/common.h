@@ -261,7 +261,7 @@ public:
 		out.Add(c);
 		ondesk[turn] = c;
 		if (turn != first && GetSuit(c) != GetSuit(ondesk[first])) {
-			playerSuitOut_[turn][(uint8_t) GetSuit(c)] = true;
+			playerSuitOut_[turn][(uint8_t) GetSuit(ondesk[first])] = true;
 		}
 
 		if (turn == first || IsCardCovers(c, ondesk[curBest], trump)) {
@@ -342,7 +342,7 @@ public:
 	}
 
 	bool IsSuitOut(uint8_t player, Suit suit) const {
-		return playerSuitOut_[(uint8_t) suit][player];
+		return playerSuitOut_[player][(uint8_t) suit];
 	}
 
 	void OpenHand(CardsSet Hand) {
