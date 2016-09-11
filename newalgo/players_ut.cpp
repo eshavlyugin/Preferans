@@ -27,7 +27,7 @@ TEST(PlayersUT, ModelPlayerStrongerThanRandom) {
 	for (uint32_t iter = 0; iter < 5000; iter++) {
 		GameState state = GenLayout();
 		GameManager manager(players);
-		manager.SetNewLayout(state, /*open-cards=*/true);
+		manager.SetNewLayout(state, /*open-cards=*/false);
 		manager.PlayToTheEnd();
 		ASSERT_EQ(manager.GetState().GetMoveNumber(), 10);
 		for (uint32_t i = 0; i < 3; i++) {

@@ -46,7 +46,7 @@ public:
 	}
 	virtual Card DoMove() {
 		ourHero_ = stateView_.GetCurPlayer();
-		auto result = RunForNSimulations(IsCardsOpen() ? *xray_.get() : stateView_, 20000);
+		auto result = RunForNSimulations(IsCardsOpen() ? *xray_.get() : stateView_, 2000);
 		cerr << "OK!" << endl;
 		return result;
 	}
@@ -69,11 +69,7 @@ private:
 	}
 
 	vector<GameState> SampleLayouts(const GameState& prev, uint32_t count) {
-		vector<GameState> result;
-		for (uint32_t i = 0; i < count; i++) {
-			result.push_back(SimpleSampler(prev, first_, ourHero_, /*playMoveHistory*/true));
-		}
-		return result;
+		return SimpleSampler(prev, count, first_, ourHero_, /*playMoveHistory*/true);
 	}
 
 	Card RunForNSimulations(const GameState& state, uint32_t numOfSimulations) {
@@ -105,6 +101,7 @@ private:
 			if (IsCardsOpen()) {
 				node->sampled_ = {game};
 			} else {
+				// TODO: think of some dynamic sampling?
 				node->sampled_ = SampleLayouts(game, 8);
 			}
 			for (const auto& sample : node->sampled_) {
@@ -134,13 +131,18 @@ private:
 
 		int total = 0;
 		for (auto child : node->childs_) {
-			total += child->n_;
+			if (sample.IsValidMove(child->move_)) {
+				total += child->n_;
+			}
 		}
 		static const float C = 3.8;
 		auto eval = [](shared_ptr<MCNode> node, float logTotal) {
 			return node->sum_ / node->n_ + C * sqrt(1e-6 + logTotal / node->n_);
 		};
 		auto child = *std::max_element(node->childs_.begin(), node->childs_.end(), [&](auto child1, auto child2) {
+			if (sample.IsValidMove(child1->move_) != sample.IsValidMove(child2->move_)) {
+				return sample.IsValidMove(child1->move_) < sample.IsValidMove(child2->move_);
+			}
 			return eval(child1, log(total)) < eval(child2, log(total));
 		});
 		uint32_t curPlayer = game.GetCurPlayer();

@@ -179,6 +179,7 @@ public:
 
 	void OnNewLayout(const GameState& state) override final {
 		state_ = state;
+		firstPlayer_ = state.GetFirstPlayer();
 		for (uint32_t i = 0; i < 3; ++i) {
 			if (!state_.IsHandClosed(i)) {
 				ourHero_ = i;
@@ -216,22 +217,28 @@ public:
 		auto valid = state_.GenValidMoves();
 		Card bestMove = NoCard;
 		float best = 1e10f;
-		assert(valid == xrayLayout_->GenValidMoves());
+		vector<GameState> statesToTest;
+		if (xrayLayout_.get()) {
+			statesToTest.push_back(*xrayLayout_.get());
+		} else {
+			statesToTest = SimpleSampler(state_, 5, firstPlayer_, ourHero_, /*playMoveHistory=*/true);
+		}
 		for (auto card : valid) {
-			GameState copy = state_;
-			GameState xray = xrayLayout_.get() ? *xrayLayout_.get() : state_;
-			copy.MakeMove(card);
-			xray.MakeMove(card);
-			StateContext ctx(copy, xray, probabilities_, NoCard, state_.GetCurPlayer());
-			auto weight = movePredictor_->CalcWeights(ctx)[0] + copy.GetScores()[state_.GetCurPlayer()];
-			cerr << CardToString(card) << " Weight = " << weight << endl;
+			float weight = 0.0f;
+			for (const auto& sampled : statesToTest) {
+				GameState copy = state_;
+				copy.MakeMove(card);
+				GameState copy2 = sampled;
+				copy2.MakeMove(card);
+				StateContext ctx(copy, copy2, probabilities_, NoCard, state_.GetCurPlayer());
+				weight += movePredictor_->CalcWeights(ctx)[0] + copy.GetScores()[state_.GetCurPlayer()];
+			}
+			weight /= statesToTest.size();
 			if (best > weight) {
 				best = weight;
 				bestMove = card;
 			}
 		}
-		cerr << "---------" << endl;
-		xrayLayout_->Dump(cerr);
 		return bestMove;
 	}
 
@@ -285,6 +292,7 @@ private:
 	shared_ptr<ModelPredictor> movePredictor_;
 	array<uint8_t, 32> knownCards_ = {{0}};
 	uint32_t ourHero_ = 0;
+	uint32_t firstPlayer_ = 0;
 	vector<shared_ptr<ModelPredictor>> cardPredictors_;
 	vector<shared_ptr<ModelPredictor>> trainPredictors_;
 	CardsProbabilities probabilities_;

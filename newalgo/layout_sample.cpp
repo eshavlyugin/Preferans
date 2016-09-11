@@ -67,7 +67,7 @@ vector<GameState> SampleFromDistribution(const CardsProbabilities& probArray,
 	return result;
 }
 
-GameState SimpleSampler(const GameState& state, uint32_t firstPlayer, uint32_t ourHero, bool playMoveHistory) {
+vector<GameState> SimpleSampler(const GameState& state, uint32_t numOfSamples, uint32_t firstPlayer, uint32_t ourHero, bool playMoveHistory) {
 	CardsProbabilities probs = {{0.0f}};
 	CardsSet out;
 	vector<CardsSet> hands(3);
@@ -99,10 +99,12 @@ GameState SimpleSampler(const GameState& state, uint32_t firstPlayer, uint32_t o
 		}
 		probs[3][bit] = 2.0 / total;
 	}
-	GameState result = SampleFromDistribution(probs, 1, firstPlayer, NoSuit)[0];
+	vector<GameState> result = SampleFromDistribution(probs, numOfSamples, firstPlayer, NoSuit);
 	if (playMoveHistory) {
-		for (const auto& moveData : state.GetMoveHistory()) {
-			result.MakeMove(moveData.card_);
+		for (GameState& stateToReturn : result) {
+			for (const auto& moveData : state.GetMoveHistory()) {
+				stateToReturn.MakeMove(moveData.card_);
+			}
 		}
 	}
 	return result;
