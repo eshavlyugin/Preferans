@@ -46,7 +46,7 @@ public:
 	}
 	virtual Card DoMove() {
 		ourHero_ = stateView_.GetCurPlayer();
-		auto result = RunForNSimulations(IsCardsOpen() ? *xray_.get() : stateView_, 2000);
+		auto result = RunForNSimulations(IsCardsOpen() ? *xray_.get() : stateView_, 5000);
 		cerr << "OK!" << endl;
 		return result;
 	}
@@ -102,7 +102,7 @@ private:
 				node->sampled_ = {game};
 			} else {
 				// TODO: think of some dynamic sampling?
-				node->sampled_ = SampleLayouts(game, 8);
+				node->sampled_ = SampleLayouts(game, 16);
 			}
 			for (const auto& sample : node->sampled_) {
 				CardsProbabilities probs;

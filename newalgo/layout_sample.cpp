@@ -47,8 +47,9 @@ vector<GameState> SampleFromDistribution(const CardsProbabilities& probArray,
 			probs[3] = widow > 0 ? (dp[rem[0]][rem[1]][rem[2]][widow - 1] * probArray[3][bit]) : 0.0f;
 			float sum = probs[0] + probs[1] + probs[2] + probs[3];
 			assert(sum > 1e-11f);
-			float rnd = min(0.999999f * sum, sum * rand() / RAND_MAX);
-			assert(rnd > 1e-11f);
+			float rnd = sum * rand() / RAND_MAX;
+			rnd = std::min(rnd, sum * 0.999999f);
+			rnd = std::max(rnd, 0.000001f);
 			for (uint32_t idx = 0; idx < 4; idx++) {
 				if (idx == 3) {
 					assert(widow != 0);
