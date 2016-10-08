@@ -67,7 +67,7 @@ void GameSampler::SampleForLayoutScores(const GameState& layout,
 		}
 		for (uint32_t idx = 0; idx < 3; idx++) {
 			scores[idx] /= options_.PlayoutsPerMove * (10 - moveNumber);
-			assert(scores[idx] < 1.0001f && "Something wrong with the algorithm");
+			PREF_ASSERT(scores[idx] < 1.0001f && "Something wrong with the algorithm");
 		}
 		CardsProbabilities probabilities;
 		players[playerToSample]->GetCardProbabilities(probabilities);
@@ -104,7 +104,7 @@ void GameSampler::SampleForLayout(const GameState& layout,
 			players[playerToSample]->GetCardProbabilities(probs);
 			auto layouts = SampleFromDistribution(probs, options_.PlayoutsPerMove, layout.GetCurPlayer(), layout.GetTrump());
 			for (const auto& layout : layouts) {
-				assert(layout.Hand(playerToSample) == currentLayout->Hand(playerToSample) && "somehting wrong with the sampling algorithm");
+				PREF_ASSERT(layout.Hand(playerToSample) == currentLayout->Hand(playerToSample) && "somehting wrong with the sampling algorithm");
 				GameManager newMgr(players);
 				newMgr.SetNewLayout(layout);
 				const GameState* tmpLayout = &manager.GetState();

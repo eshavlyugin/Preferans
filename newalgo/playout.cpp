@@ -17,8 +17,8 @@ map<Card, array<float, 3>> PlayoutManager::Play(const GameManager& gameMgr,
 			mgrCopy.PlayToTheEnd();
 			const auto& copy = mgrCopy.GetState();
 			auto scores = copy.GetScores();
-			assert(copy.GetMoveNumber() == 10);
-			assert(scores[0] + scores[1] + scores[2] == 10);
+			PREF_ASSERT(copy.GetMoveNumber() == 10);
+			PREF_ASSERT(scores[0] + scores[1] + scores[2] == 10);
 			for (int i = 0; i < sumOfScores.size(); i++) {
 				sumOfScores[i] += scores[i];
 			}

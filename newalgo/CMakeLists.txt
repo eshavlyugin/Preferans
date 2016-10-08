@@ -9,6 +9,7 @@ find_package(GTest)
 find_package(Boost 1.40 COMPONENTS program_options REQUIRED )
 
 ADD_LIBRARY(PrefLib
+  common.cpp
   features.cpp
   gamemgr.cpp
   generate.cpp

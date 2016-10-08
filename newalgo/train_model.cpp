@@ -36,7 +36,7 @@ public:
 		for (uint32_t i = 0; i < featureSet.size(); ++i) {
 			featureMap_[i] = validTypes[featureSet[i].tag_] ? counter++ : InvalidIndex;
 		}
-		assert((input_ == counter) && "Invalid number of features in model");
+		PREF_ASSERT((input_ == counter) && "Invalid number of features in model");
 	}
 
 	virtual vector<float> Predict(const FeaturesSet& features) {
@@ -99,7 +99,7 @@ public:
 		for (uint32_t i = 0; i < featureSet.size(); ++i) {
 			featureMap_[i] = validTypes[featureSet[i].tag_] ? counter++ : InvalidIndex;
 		}
-		assert((input_ == counter) && "Invalid number of features in model");
+		PREF_ASSERT((input_ == counter) && "Invalid number of features in model");
 	}
 
 	virtual vector<float> Predict(const FeaturesSet& features) {
@@ -143,7 +143,7 @@ public:
 		} else if (model_name == "2_layer_nn") {
 			return shared_ptr<IModel>(new NN2LayerModel(ist, {FT_OpenCards, FT_CommonCards}));
 		} else {
-			assert(false && "Unknown model name");
+			PREF_ASSERT(false && "Unknown model name");
 		}
 		return shared_ptr<IModel>(nullptr);
 	}
@@ -220,7 +220,7 @@ vector<float> ModelPredictor::PredictProbabilities(StateContext& ctx) {
 void TrainModel::AddFeatures(const FeaturesSet& features) {
 	featuresArray_.push_back(vector<float>());
 	auto featureSet = features.GetFeatures();
-	assert(tags_.size() == 0 || tags_.size() == featureSet.size());
+	PREF_ASSERT(tags_.size() == 0 || tags_.size() == featureSet.size());
 	tags_.resize(featureSet.size());
 	for (uint32_t i = 0; i < featureSet.size(); i++) {
 		featuresArray_.back().push_back(featureSet[i].value_);
@@ -259,20 +259,7 @@ void TrainModel::AddGameInfo(const StateContext& ctx) {
 
 void TrainModel::WriteTsv(ostream& ost) {
 	for (auto tag : tags_) {
-		switch (tag) {
-		case FeatureTag::FT_Move:
-			ost << "move\t";
-			break;
-		case FeatureTag::FT_CommonCards:
-			ost << "common_cards\t";
-			break;
-		case FeatureTag::FT_OpenCards:
-			ost << "open_cards\t";
-			break;
-		case FeatureTag::FT_CloseCards:
-			ost << "close_cards\t";
-			break;
-		}
+		ost << TagToString(tag) << "\t";
 	}
 
 	for (uint32_t i = 0; i < 32; i++) {
@@ -285,7 +272,7 @@ void TrainModel::WriteTsv(ostream& ost) {
 	ost << "expected_score_2\texpected_score_3\texpected_score_6\texpected_score_norm\texpected_score\n";
 	//ost << "expected_score\n";
 
-	assert(actions_[0].size() == 70 && "Wrong actions size");
+	PREF_ASSERT(actions_[0].size() == 70 && "Wrong actions size");
 
 	for (uint32_t i = 0; i < featuresArray_.size(); i++) {
 		for (float value : featuresArray_[i]) {

@@ -2,20 +2,25 @@
 
 #include <bits/stdc++.h>
 
-#undef assert
+#define PREF_ASSERT(EXPR) PrefAssertImpl(EXPR, #EXPR , __FILE__, __LINE__ )
 
 using namespace std;
 
-static void my_assert(bool passed, const char* assert, const char* file,
-		long line) {
-	if (!passed) {
-		cerr << "failed assert " << assert << " in " << file << " at " << line
-				<< ".\n";
-		abort();
-	}
+typedef void AssertHandler(const char* assert, const char* file, long line);
+
+extern AssertHandler* globalAssertHandler;
+
+static void SetAssertHandler(AssertHandler* handler) {
+	globalAssertHandler = handler;
 }
 
-#define assert(EXPR) my_assert(EXPR, #EXPR , __FILE__, __LINE__ )
+static void PrefAssertImpl(bool passed, const char* assert, const char* file,
+		long line)
+{
+	if (!passed) {
+		globalAssertHandler(assert, file, line);
+	}
+}
 
 class CardsSetIterator;
 
@@ -25,9 +30,37 @@ enum Suit
 };
 
 using Rank = uint8_t;
-using Card = uint32_t;
 
-static const Card NoCard = 0;
+struct Card;
+
+inline std::string CardToString(Card c);
+inline Card StringToCard(const string& s);
+
+struct Card {
+	Card() { val_ = 0; }
+	explicit Card(uint32_t val) { val_ = val; }
+	explicit Card(const std::string& s) { this->val_ = StringToCard(s).val_; }
+
+	operator uint32_t() const { return val_; }
+	operator std::string() const { return CardToString(*this); }
+
+	bool operator == (Card other) const {
+		return val_ == other.val_;
+	}
+	bool operator != (Card other) const {
+		return val_ != other.val_;
+	}
+	bool operator > (Card other) const {
+		return val_ > other.val_;
+	}
+	bool operator < (Card other) const {
+		return val_ < other.val_;
+	}
+
+	uint32_t val_;
+};
+
+static const Card NoCard(0);
 
 class CardsSetIterator {
 public:
@@ -42,7 +75,7 @@ public:
 	}
 
 	Card operator*() const {
-		return 1u << (curShift_ - 1);
+		return Card(1u << (curShift_ - 1));
 	}
 
 	bool operator !=(const CardsSetIterator& other) {
@@ -74,8 +107,13 @@ public:
 			cards_(0) {
 	}
 
-	CardsSet(uint32_t cards) :
+	explicit CardsSet(uint32_t cards) :
 			cards_(cards) {
+	}
+
+	explicit CardsSet(Card c)
+		: cards_(c.val_)
+	{
 	}
 
 	operator uint32_t() const {
@@ -87,7 +125,7 @@ public:
 	}
 
 	CardsSet GetSubsetOfSuit(Suit s) const {
-		return cards_ & (0xff << (s * 8));
+		return CardsSet(cards_ & (0xff << (s * 8)));
 	}
 
 	bool IsInSet(Card c) const {
@@ -99,7 +137,7 @@ public:
 		return *this;
 	}
 
-	CardsSet& Add(CardsSet& s) {
+	CardsSet& Add(CardsSet s) {
 		cards_ |= s.cards_;
 		return *this;
 	}
@@ -125,7 +163,7 @@ private:
 	uint32_t cards_;
 };
 
-inline char SuitToString(Suit s) {
+inline char SuitToChar(Suit s) {
 	switch (s) {
 	case Spades:
 		return 's';
@@ -138,11 +176,30 @@ inline char SuitToString(Suit s) {
 	case NoSuit:
 		return 'n';
 	default:
+	    PREF_ASSERT(false && "Unknown card suit");
 		return ' ';
 	}
 }
 
-inline char RankToString(Rank r) {
+inline Suit CharToSuit(char c) {
+    switch (c) {
+    case 's':
+        return Spades;
+    case 'c':
+        return Clubs;
+    case 'd':
+        return Diamonds;
+    case 'h':
+        return Hearts;
+    case 'n':
+        return NoSuit;
+    default:
+        PREF_ASSERT(false && "Unknown card suit");
+        return NoSuit;
+    }
+}
+
+inline char RankToChar(Rank r) {
 	switch (r) {
 	case 0:
 		return '7';
@@ -161,16 +218,40 @@ inline char RankToString(Rank r) {
 	case 7:
 		return 'A';
 	default:
+	    PREF_ASSERT(false && "Unknown card rank");
 		return ' ';
 	}
 }
 
-inline Card IsValidCard(Card c) {
-	return c != 0;
+inline Rank CharToRank(char c) {
+    switch (c) {
+    case '7':
+        return 0;
+    case '8':
+        return 1;
+    case '9':
+        return 2;
+    case 'T':
+        return 3;
+    case 'J':
+        return 4;
+    case 'Q':
+        return 5;
+    case 'K':
+        return 6;
+    case 'A':
+        return 7;
+    default:
+        PREF_ASSERT(false && "Unknown card rank");
+        return 0xff;
+    }
+}
+inline bool IsValidCard(Card c) {
+	return __builtin_popcount(c) == 1;
 }
 
 inline Card MakeCard(Suit s, Rank r) {
-	return 1u << (s * 8 + r);
+	return Card(1u << (s * 8 + r));
 }
 
 inline Rank GetRank(Card c) {
@@ -190,7 +271,14 @@ inline Card CardFromBit(uint8_t bit) {
 }
 
 inline string CardToString(Card c) {
-	return {RankToString(GetRank(c)), SuitToString(GetSuit(c))};
+	return {RankToChar(GetRank(c)), SuitToChar(GetSuit(c))};
+}
+
+inline Card StringToCard(const string& s) {
+    PREF_ASSERT(s.size() == 2);
+    auto rank = CharToRank(s[0]);
+    auto suit = CharToSuit(s[1]);
+    return MakeCard(suit, rank);
 }
 
 inline bool IsCardCovers(Card c1, Card c2, Suit trump) {
@@ -255,7 +343,7 @@ public:
 	}
 
 	void MakeMove(Card c) {
-		assert(IsValidMove(c));
+		PREF_ASSERT(IsValidMove(c));
 		history_.push_back( { c, turn });
 		hands[turn].Remove(c);
 		out.Add(c);
@@ -276,7 +364,7 @@ public:
 			first = curBest;
 			turn = first;
 			scores[curBest]++;
-			fill(ondesk.begin(), ondesk.end(), 0);
+			fill(ondesk.begin(), ondesk.end(), NoCard);
 			moveNumber++;
 		}
 	}
@@ -308,7 +396,7 @@ public:
 
 		ost << "InGame: ";
 		for (auto card : ondesk) {
-			if (card == 0) {
+			if (card == NoCard) {
 				ost << "-- ";
 			} else {
 				ost << CardToString(card) << " ";
@@ -323,7 +411,7 @@ public:
 		ost << "Move number: " << (uint32_t) moveNumber << "\n";
 		ost << "First hand: " << (uint32_t) first << "\n";
 		ost << "Current hand: " << (uint32_t) turn << "\n";
-		ost << "Trump: " << SuitToString(trump) << "\n";
+		ost << "Trump: " << SuitToChar(trump) << "\n";
 	}
 
 	bool IsHandClosed(uint32_t hand) const {
@@ -376,7 +464,7 @@ private:
 	vector<MoveData> history_;
 	array<CardsSet, 3> hands;
 	CardsSet out;
-	array<Card, 3> ondesk = { { 0 } };
+	array<Card, 3> ondesk = {{NoCard, NoCard, NoCard}};
 	array<uint8_t, 3> scores = { { 0 } };
 	array<bool, 3> isClosed = { { false } };
 	array<array<bool, 4>, 3> playerSuitOut_ = { { { { false } } } };
@@ -386,5 +474,31 @@ private:
 	uint8_t turn = 0;
 	uint8_t curBest = 0;
 };
+
+inline istream& operator >> (istream& ist, GameState& gs) {
+    array<CardsSet, 3> hands;
+    for (auto& set : hands) {
+        for (uint32_t i = 0; i < 10; ++i) {
+            string tmp;
+            ist >> tmp;
+            set.Add(StringToCard(tmp));
+        }
+    }
+    uint32_t first;
+    ist >> first;
+    gs = GameState(hands, first, NoSuit);
+    return ist;
+}
+
+inline ostream& operator << (ostream& ost, const GameState& gs) {
+    for (uint32_t player = 0; player < 3; ++player) {
+        for (auto card : gs.Hand(player)) {
+            ost << CardToString(card) << " ";
+        }
+        ost << "\n";
+    }
+    ost << gs.GetFirstPlayer() << "\n";
+    return ost;
+}
 
 using CardsProbabilities = array<array<float, 32>, 4>;

@@ -7,7 +7,7 @@
 
 namespace po = boost::program_options;
 
-void PlayLoop(const vector<std::shared_ptr<IPlayer>>& players, array<int, 3>& scores, bool dump, bool openCards) {
+void PlayLoop(const vector<std::shared_ptr<IPlayer>>& players, array<int, 3>& scores, bool dump, bool openCards, shared_ptr<ostream> recordFile) {
 	GameState state = GenLayout();
 	GameManager manager(players);
 	manager.SetNewLayout(state, openCards);
@@ -16,7 +16,14 @@ void PlayLoop(const vector<std::shared_ptr<IPlayer>>& players, array<int, 3>& sc
 	for (int i = 0; i < 3; i++) {
 		scores[i] += manager.GetState().GetScores()[i];
 	}
-	state.Dump(cerr);
+	if (recordFile.get()) {
+	    *recordFile.get() << state;
+	    for (auto& historyItem : manager.GetState().GetMoveHistory()) {
+	        *recordFile.get() << CardToString(historyItem.card_) << " ";
+	    }
+	    *recordFile.get() << "\n";
+	    recordFile->flush();
+	}
 }
 
 void PlayGames(const po::variables_map& opt) {
@@ -30,9 +37,14 @@ void PlayGames(const po::variables_map& opt) {
 	players.push_back(CreatePlayer(player2));
 	players.push_back(CreatePlayer(player3));
 	array<int, 3> scores = {{0}};
+	string recordFile = opt["record-games-to-file"].as<string>();
+	shared_ptr<ostream> recordFileStream;
+	if (recordFile.size() > 0) {
+	    recordFileStream.reset(new ofstream(recordFile));
+	}
 	bool openCards = opt.count("open-cards");
 	for (int i = 0; i < numGames; i++) {
-		PlayLoop(players, scores, dump, openCards);
+		PlayLoop(players, scores, dump, openCards, recordFileStream);
 	}
 	cerr << "Simulation finished" << endl;
 	cerr << "Scores: " << scores[0] << ", " << scores[1] << ", " << scores[2] << endl;
@@ -49,6 +61,7 @@ int main(int argc, char* argv[]) {
 			("play3", po::value<string>()->default_value("random:random:random"), ("model folder for 3rd player moves " + formatDescr).c_str())
 			("open-cards", "players are playing on open cards")
 			("num-games", po::value<int>()->default_value(1), "number of games to play")
+			("record-games-to-file", po::value<string>()->default_value(""), "Dump games to file")
 			;
 
 	po::variables_map vm;

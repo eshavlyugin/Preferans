@@ -9,7 +9,7 @@ FeaturesSet::FeaturesSet(FeaturesRegistry* registry) :
 }
 
 void FeaturesSet::Set(const FeaturesRange& range, uint32_t pos, float value) {
-	assert(range.GetLength() > pos);
+	PREF_ASSERT(range.GetLength() > pos);
 	auto finalPos = range.GetStart() + pos;
 	features_.push_back(make_pair(finalPos, value));
 }
@@ -71,6 +71,22 @@ FeaturesRange::FeaturesRange(FeaturesRegistry* registry, uint32_t length,
 		FeatureTag type) :
 		start_(registry->GetTotal()), length_(length), type_(type) {
 	registry->RegisterRange(this);
+}
+
+string TagToString(FeatureTag tag) {
+	switch (tag) {
+	case FeatureTag::FT_Move:
+		return "move";
+	case FeatureTag::FT_CommonCards:
+		return "common_cards";
+	case FeatureTag::FT_OpenCards:
+		return "open_cards";
+	case FeatureTag::FT_CloseCards:
+		return "close_cards";
+	default:
+		PREF_ASSERT(false);
+		return "";
+	}
 }
 
 FeaturesSet CalcFeatures(const GameState& playerView, const GameState& realGame,

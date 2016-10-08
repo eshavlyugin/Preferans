@@ -13,7 +13,7 @@ void TestLoop() {
 	GameManager manager(players);
 	manager.SetNewLayout(state);
 	manager.PlayToTheEnd();
-	assert(manager.GetState().GetMoveNumber() == 10);
+	PREF_ASSERT(manager.GetState().GetMoveNumber() == 10);
 }
 
 void PrintRandomState() {
@@ -56,7 +56,7 @@ int main() {
 	for (int hand = 0; hand < 3; hand++) {
 		for (auto card : layout.Hand(hand)) {
 			cout << card << endl;
-			assert(layout.Hand(hand).IsInSet(card));
+			PREF_ASSERT(layout.Hand(hand).IsInSet(card));
 		}
 	}
 	/*  for (int i = 0; i < 1000000; i++) {

@@ -42,7 +42,7 @@ TEST (LayoutSamplingTest, GenerateSimpleLayout) {
 		GameManager manager(players);
 		manager.SetNewLayout(gameState, /*openCards=*/true);
 		manager.PlayForNMoves(15);
-		auto newLayouts = SimpleSampler(manager.GetState(), 5, gameState.GetFirstPlayer(), 0, /*playMoveHistory=*/false);
+		auto newLayouts = SimpleSampler(manager.GetState(), 5, gameState.GetFirstPlayer(), 0, /*playMoveHistory=*/false, /*canBeInvalid*/false);
 		for (const auto& newLayout : newLayouts) {
 			// 2. If suit is out for some player, cards of suit in sampled layout must be the same
 			// 3. Moves in history must be in the player hands

@@ -221,7 +221,7 @@ public:
 		if (xrayLayout_.get()) {
 			statesToTest.push_back(*xrayLayout_.get());
 		} else {
-			statesToTest = SimpleSampler(state_, 5, firstPlayer_, ourHero_, /*playMoveHistory=*/true);
+			statesToTest = SimpleSampler(state_, 5, firstPlayer_, ourHero_, /*playMoveHistory=*/true, /*canBeInvalid*/false);
 		}
 		for (auto card : valid) {
 			float weight = 0.0f;
@@ -343,7 +343,7 @@ public:
 			}
 			prob -= pair.second;
 		}
-		assert(false && "something wrong with the algorithm");
+		PREF_ASSERT(false && "something wrong with the algorithm");
 		return NoCard;
 	}
 
@@ -398,10 +398,10 @@ std::shared_ptr<IPlayer> CreatePlayer(const std::string& descr) {
 			} else if (descrAndProb.size() == 2) {
 				pair.second = std::stod(descrAndProb[1]);
 			} else {
-				assert(false && "Expected in format descr,weight");
+				PREF_ASSERT(false && "Expected in format descr,weight");
 			}
 			vector<string> parts = utils::split(descrAndProb[0], ':');
-			assert(parts.size() == 3 && "player description is expected in format play:probsWorking:probsForTrain");
+			PREF_ASSERT(parts.size() == 3 && "player description is expected in format play:probsWorking:probsForTrain");
 			const string& playFolder = parts[0];
 			const string& probsFolder = parts[1];
 			const string& probsTrainFolder = parts[2];

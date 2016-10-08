@@ -98,5 +98,6 @@ private:
 	void RegisterRange(FeaturesRange* range);
 };
 
+string TagToString(FeatureTag tag);
 FeaturesSet CalcFeatures(const GameState& playerView, const GameState& realState,
 		const CardsProbabilities& probArray, Card move, uint32_t ourHero);

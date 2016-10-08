@@ -18,6 +18,7 @@ struct MCNode {
 	float sum_ = 0;
 	Card move_;
 	list<shared_ptr<MCNode>> childs_;
+	bool invalid_ = false;
 	vector<GameState> sampled_;
 };
 
@@ -46,7 +47,7 @@ public:
 	}
 	virtual Card DoMove() {
 		ourHero_ = stateView_.GetCurPlayer();
-		auto result = RunForNSimulations(IsCardsOpen() ? *xray_.get() : stateView_, 5000);
+		auto result = RunForNSimulations(IsCardsOpen() ? *xray_.get() : stateView_, 2000);
 		cerr << "OK!" << endl;
 		return result;
 	}
@@ -68,10 +69,6 @@ private:
 		game = mgr.GetState();
 	}
 
-	vector<GameState> SampleLayouts(const GameState& prev, uint32_t count) {
-		return SimpleSampler(prev, count, first_, ourHero_, /*playMoveHistory*/true);
-	}
-
 	Card RunForNSimulations(const GameState& state, uint32_t numOfSimulations) {
 		auto root = shared_ptr<MCNode>(new MCNode());
 		for (uint32_t i = 0; i < numOfSimulations; i++) {
@@ -91,18 +88,21 @@ private:
 		return xray_.get();
 	}
 
-	void DoSearch(shared_ptr<MCNode> node, GameState& game) {
+	bool DoSearch(shared_ptr<MCNode> node, GameState& game) {
 		if (game.GetMoveNumber() == 10) {
-			return;
+			return true;
 		}
 		// leaf node
 		bool leaf = node->childs_.size() == 0;
 		if (node->sampled_.size() == 0) {
-			if (IsCardsOpen()) {
+			if (!game.IsHandClosed(0) && !game.IsHandClosed(1) && !game.IsHandClosed(2)) {
 				node->sampled_ = {game};
 			} else {
-				// TODO: think of some dynamic sampling?
-				node->sampled_ = SampleLayouts(game, 16);
+				node->sampled_ = SimpleSampler(game, 32, first_, ourHero_, /*playMoveHistory*/true, /*canBeInvalid*/true);
+				if (node->sampled_.size() == 0) {
+					node->invalid_ = true;
+					return false;
+				}
 			}
 			for (const auto& sample : node->sampled_) {
 				CardsProbabilities probs;
@@ -110,8 +110,12 @@ private:
 				for (const auto child : node->childs_) {
 					nodes[GetCardBit(child->move_)] = child.get();
 				}
+				PREF_ASSERT(sample.GenValidMoves().Size() != 0 && "Something wrong with sampling");
 				for (auto move : sample.GenValidMoves()) {
 					MCNode* child = nodes[GetCardBit(move)];
+					if (child && child->invalid_) {
+						continue;
+					}
 					if (!child) {
 						node->childs_.push_back(shared_ptr<MCNode>(new MCNode()));
 						child = node->childs_.back().get();
@@ -140,22 +144,31 @@ private:
 			return node->sum_ / node->n_ + C * sqrt(1e-6 + logTotal / node->n_);
 		};
 		auto child = *std::max_element(node->childs_.begin(), node->childs_.end(), [&](auto child1, auto child2) {
-			if (sample.IsValidMove(child1->move_) != sample.IsValidMove(child2->move_)) {
-				return sample.IsValidMove(child1->move_) < sample.IsValidMove(child2->move_);
+			bool valid1 = sample.IsValidMove(child1->move_) && !child1->invalid_;
+			bool valid2 = sample.IsValidMove(child2->move_) && !child2->invalid_;
+			if (valid1 != valid2) {
+				return valid1 < valid2;
 			}
 			return eval(child1, log(total)) < eval(child2, log(total));
 		});
+		if (child->invalid_) {
+			return false;
+		}
 		uint32_t curPlayer = game.GetCurPlayer();
+		bool searched = true;
 		if (leaf) {
 			game = sample;
 			game.MakeMove(child->move_);
 			PlayToTheEnd(game);
 		} else {
 			game.MakeMove(child->move_);
-			DoSearch(child, game);
+			searched = DoSearch(child, game);
 		}
-		child->n_++;
-		child->sum_ -= game.GetScores()[curPlayer];
+		if (searched) {
+			child->n_++;
+			child->sum_ -= game.GetScores()[curPlayer];
+		}
+		return searched;
 	}
 
 private:
