@@ -89,6 +89,10 @@ uint32_t GetCardBitWrap(const std::string& card) {
 	return GetCardBit(StringToCard(card));
 }
 
+void CloseHandsWrap(GameState& gs, bp::list list) {
+	gs.CloseHands(vector<uint8_t>(bp::stl_input_iterator<uint8_t>(list), bp::stl_input_iterator<uint8_t>()));
+}
+
 GameManager* CreateGameManager(bp::list l) {
 	return new GameManager(vector<shared_ptr<IPlayer>>(bp::stl_input_iterator<shared_ptr<IPlayer>>(l), bp::stl_input_iterator<shared_ptr<IPlayer>>()));
 }
@@ -122,7 +126,8 @@ BOOST_PYTHON_MODULE(Pref_pywrap)
     		.def("GetScores", GetScoresWrap)
 			.def("Hand", &GameState::Hand)
 			.def("OnDesk", &GameState::OnDesk)
-			.def("IsHandClosed", &GameState::IsHandClosed);
+			.def("IsHandClosed", &GameState::IsHandClosed)
+			.def("CloseHands", &CloseHandsWrap);
 
     boost::python::class_<IPlayer, shared_ptr<IPlayer>, boost::noncopyable>("Player", no_init)
     		.def("create", CreatePlayer)
