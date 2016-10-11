@@ -78,8 +78,6 @@ public:
 	FeaturesRange Trump;
 	FeaturesRange Move;
 	FeaturesRange NumOfSuit;
-	FeaturesRange LastMove1[3];
-	FeaturesRange LastMove2[3];
 	FeaturesRange RealHands[3];
 	FeaturesRange RealOutOfGame;
 	FeaturesRange CurrentMove;

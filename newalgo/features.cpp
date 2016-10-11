@@ -41,9 +41,7 @@ FeaturesRegistry::FeaturesRegistry()
 		, CardsOnDesk({ FeaturesRange(this, NumCardFeatures, FT_CommonCards), FeaturesRange(this, NumCardFeatures, FT_CommonCards), FeaturesRange(this, NumCardFeatures, FT_CommonCards) })
 		, Trump(this, 4, FT_CommonCards)
 		, Move(this, NumCardFeatures, FT_Move)
-		, NumOfSuit(this, 9 * 4 * 3, FT_CloseCards)
-		, LastMove1({ FeaturesRange(this, NumCardFeatures, FT_CommonCards) , FeaturesRange(this, NumCardFeatures, FT_CommonCards), FeaturesRange(this, NumCardFeatures, FT_CommonCards) })
-		, LastMove2({ FeaturesRange(this, NumCardFeatures, FT_CommonCards) , FeaturesRange(this, NumCardFeatures, FT_CommonCards), FeaturesRange(this, NumCardFeatures, FT_CommonCards) })
+		, NumOfSuit(this, 9 * 4 * 3, FT_OpenCards)
 		, RealHands({ FeaturesRange(this, NumCardFeatures, FT_OpenCards) , FeaturesRange(this, NumCardFeatures, FT_OpenCards), FeaturesRange(this, NumCardFeatures, FT_OpenCards) })
 		, RealOutOfGame(this, NumCardFeatures, FT_OpenCards)
 		, CurrentMove(this, 3, FT_CommonCards)
@@ -171,27 +169,14 @@ FeaturesSet CalcFeatures(const GameState& playerView, const GameState& realGame,
 		result.Set(reg.Trump, (uint32_t) playerView.GetTrump(), 1.0f);
 	}
 
-	if (IsValidCard(move)) {
+	/*if (IsValidCard(move)) {
 		setCardF(reg.Move, move, 1.0f);
-	}
+	}*/
 
 	if (realGame.GetMoveNumber() < 10) {
 		result.Set(reg.MoveNumber, realGame.GetMoveNumber(), 1.0f);
 	}
 
-	/*const auto& history = playerView.GetMoveHistory();
-	if (playerView.GetMoveNumber() >= 2) {
-		for (uint32_t i = 0; i < 3; i++) {
-			const auto& move = history[(playerView.GetMoveNumber() - 2) * 3 + i];
-			result.Set(reg.LastMove1[move.player_], GetCardBit(move.card_), 1.0f);
-		}
-	}
-	if (playerView.GetMoveNumber() >= 1) {
-		for (uint32_t i = 0; i < 3; i++) {
-			const auto& move = history[(playerView.GetMoveNumber() - 1) * 3 + i];
-			result.Set(reg.LastMove2[move.player_], GetCardBit(move.card_), 1.0f);
-		}
-	}*/
 	return result;
 }
 

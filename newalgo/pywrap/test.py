@@ -40,7 +40,7 @@ class TestModule:
         assert not 'As' in game.Hand(0)
         assert not 'Qd' in game.Hand(0)
 
-	print 'Features:', p.CalcFeatures(game, 1)[0:10]
+	print 'Features:', len(p.CalcFeatures(game, 1))
 
         game.MakeMove('7h')
         assert not '7h' in game.Hand(0)
