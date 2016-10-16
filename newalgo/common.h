@@ -62,20 +62,32 @@ struct Card {
 
 static const Card NoCard(0);
 
-class CardsSetIterator {
+class CardsSetIterator : public iterator<input_iterator_tag, Card> {
 public:
 	CardsSetIterator(uint32_t cards) :
-			cards_(cards) {
+		cards_(cards)
+	{
 		Shift();
+	}
+	CardsSetIterator(const CardsSetIterator& other)
+		: cards_(other.cards_)
+		, card_(other.card_)
+		, curShift_(other.curShift_)
+	{
 	}
 
 	CardsSetIterator& operator++() {
 		Shift();
 		return *this;
 	}
+	CardsSetIterator operator++(int) {
+		CardsSetIterator orig(*this);
+		Shift();
+		return orig;
+	}
 
-	Card operator*() const {
-		return Card(1u << (curShift_ - 1));
+	Card& operator*() {
+		return card_;
 	}
 
 	bool operator !=(const CardsSetIterator& other) {
@@ -93,10 +105,12 @@ private:
 			auto pos = __builtin_ctz(cards_);
 			curShift_ += pos + 1;
 			cards_ >>= pos + 1;
+			card_ = Card(1u << (curShift_ - 1));
 		}
 	}
 
 private:
+	Card card_;
 	uint32_t cards_;
 	uint32_t curShift_ = 0;
 };

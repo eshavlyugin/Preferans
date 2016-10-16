@@ -85,6 +85,11 @@ bp::list GenValidMovesWrap(const GameState& gameState) {
 	return result;
 }
 
+template<class T>
+T CopyObject(const T& t) {
+	return t;
+}
+
 uint32_t GetCardBitWrap(const std::string& card) {
 	return GetCardBit(StringToCard(card));
 }
@@ -110,15 +115,18 @@ BOOST_PYTHON_MODULE(Pref_pywrap)
     bp::implicitly_convertible<std::string, Card>();
     bp::implicitly_convertible<Card, CardsSet>();
 
-    boost::python::class_<Card>("Card", no_init);
+    boost::python::class_<Card>("Card", no_init)
+    		.def("__str__", &Card::operator string);
 
     boost::python::class_<CardsSet>("CardsSet", no_init)
     		.def("__init__", bp::make_constructor(MakeCardsSet))
     		.def("__contains__", &CardsSet::IsInSet)
+			.def("__iter__", range(&CardsSet::begin, &CardsSet::end))
 			.def("Add", AddCardsSet, return_internal_reference<>());
 
     boost::python::class_<GameState>("GameState", no_init)
     		.def("__init__", bp::make_constructor(MakeGameState))
+			.def("__copy__", &CopyObject<GameState>)
 			.def("Hand", &GameState::Hand)
     		.def("MakeMove", &GameState::MakeMove)
     		.def("IsValidMove", &GameState::IsValidMove)

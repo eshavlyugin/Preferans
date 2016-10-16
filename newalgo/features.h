@@ -75,15 +75,7 @@ public:
 	FeaturesRange PlayerCards[3];
 	FeaturesRange NotInGameCards;
 	FeaturesRange CardsOnDesk[3];
-	FeaturesRange Trump;
 	FeaturesRange Move;
-	FeaturesRange NumOfSuit;
-	FeaturesRange RealHands[3];
-	FeaturesRange RealOutOfGame;
-	FeaturesRange CurrentMove;
-	FeaturesRange PlayerWithGreaterCard;
-	FeaturesRange MoveNumber;
-	FeaturesRange FirstPlayer;
 	FeaturesRange IsGreaterCard;
 
 	vector<FeaturesRange*> GetRangesInOrder() const;

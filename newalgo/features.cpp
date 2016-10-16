@@ -39,15 +39,7 @@ FeaturesRegistry::FeaturesRegistry()
 		: PlayerCards({ FeaturesRange(this, NumCardFeatures, FT_CloseCards), FeaturesRange(this, NumCardFeatures, FT_CloseCards), FeaturesRange(this, NumCardFeatures, FT_CloseCards) })
 		, NotInGameCards(this, NumCardFeatures, FT_CloseCards)
 		, CardsOnDesk({ FeaturesRange(this, NumCardFeatures, FT_CommonCards), FeaturesRange(this, NumCardFeatures, FT_CommonCards), FeaturesRange(this, NumCardFeatures, FT_CommonCards) })
-		, Trump(this, 4, FT_CommonCards)
 		, Move(this, NumCardFeatures, FT_Move)
-		, NumOfSuit(this, 9 * 4 * 3, FT_OpenCards)
-		, RealHands({ FeaturesRange(this, NumCardFeatures, FT_OpenCards) , FeaturesRange(this, NumCardFeatures, FT_OpenCards), FeaturesRange(this, NumCardFeatures, FT_OpenCards) })
-		, RealOutOfGame(this, NumCardFeatures, FT_OpenCards)
-		, CurrentMove(this, 3, FT_CommonCards)
-		, PlayerWithGreaterCard(this, 3, FT_CommonCards)
-		, FirstPlayer(this, 3, FT_CommonCards)
-		, MoveNumber(this, 10, FT_CommonCards)
 		, IsGreaterCard(this, 32, FT_CommonCards)
 {
 }
@@ -96,8 +88,6 @@ FeaturesSet CalcFeatures(const GameState& playerView, const GameState& realGame,
 	CardsSet knownCards = playerView.GetKnownCards();
 	auto setCardF = [&](FeaturesRange& fr, Card c, float value) {
 		result.Set(fr, GetCardBit(c), value);
-		/*result.Set(fr, GetRank(c), value);
-		result.Set(fr, 8 + (uint32_t)GetSuit(c), value);*/
 	};
 
 	for (uint32_t cardBit = 0; cardBit < 32; cardBit++) {
@@ -106,42 +96,9 @@ FeaturesSet CalcFeatures(const GameState& playerView, const GameState& realGame,
 		}
 	}
 
-	for (uint32_t i = 0, player = ourHero; i < 3;
-			player = (player + 1) % 3, i++) {
-		for (uint32_t cardBit = 0; cardBit < 32; cardBit++) {
-			if (!knownCards.IsInSet(CardFromBit(cardBit))
-					|| playerView.Hand(player).IsInSet(CardFromBit(cardBit)))
-			{
-				setCardF(reg.PlayerCards[i], CardFromBit(cardBit),
-						knownCards.IsInSet(CardFromBit(cardBit)) ?
-								1.0f : probArray[player][cardBit]);
-			}
-		}
-	}
-
-	for (uint32_t i = 0, player = ourHero; i < 3;
-			player = (player + 1) % 3, i++) {
-		for (auto card : realGame.Hand(player)) {
-			setCardF(reg.RealHands[player], card, 1.0f);
-		}
-	}
-
 	for (uint32_t i = 0, player = ourHero; i < 3; player = (player + 1) % 3, i++) {
-		if (realGame.GetCurPlayer() == player) {
-			result.Set(reg.CurrentMove, i, 1.0f);
-		}
-		if (realGame.PlayerWithGreaterCard() == player) {
-			result.Set(reg.PlayerWithGreaterCard, i, 1.0f);
-		}
-		if (realGame.GetFirstPlayer() == player) {
-			result.Set(reg.FirstPlayer, i, 1.0f);
-		}
-	}
-
-	CardsSet cardsInGame = realGame.Hand(0).Add(realGame.Hand(1)).Add(realGame.Hand(2));
-	for (uint32_t bit = 0; bit < 32; bit++) {
-		if (!cardsInGame.IsInSet(CardFromBit(bit))) {
-			setCardF(reg.RealOutOfGame, CardFromBit(bit), 1.0f);
+		for (auto card : playerView.Hand(player)) {
+			setCardF(reg.PlayerCards[i], card, 1.0f);
 		}
 	}
 
@@ -157,24 +114,6 @@ FeaturesSet CalcFeatures(const GameState& playerView, const GameState& realGame,
 		if (playerView.OnDesk(player) != NoCard) {
 			setCardF(reg.CardsOnDesk[i], playerView.OnDesk(player), 1.0f);
 		}
-	}
-
-	for (uint8_t player = ourHero, i = 0; i < 3; i++, player = (player + 1) % 3) {
-		for (uint8_t suit = 0; suit < 4; suit++) {
-			auto size = realGame.Hand(player).GetSubsetOfSuit((Suit)suit).Size();
-			result.Set(reg.NumOfSuit, size + 8 * suit + 8 * 4 * i, 1.0f);
-		}
-	}
-	if (playerView.GetTrump() != NoSuit) {
-		result.Set(reg.Trump, (uint32_t) playerView.GetTrump(), 1.0f);
-	}
-
-	/*if (IsValidCard(move)) {
-		setCardF(reg.Move, move, 1.0f);
-	}*/
-
-	if (realGame.GetMoveNumber() < 10) {
-		result.Set(reg.MoveNumber, realGame.GetMoveNumber(), 1.0f);
 	}
 
 	return result;
