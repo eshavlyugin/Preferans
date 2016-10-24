@@ -23,10 +23,11 @@ epoch_count = 200
 data = []
 labels = []
 states = []
+cardlist = ['7s', '8s', '9s', 'Ts', 'Js', 'Qs', 'Ks', 'As', '7c', '8c', '9c', 'Tc', 'Jc', 'Qc', 'Kc', 'Ac', '7d', '8d', '9d', 'Td', 'Jd', 'Qd', 'Kd', 'Ad', '7h', '8h', '9h', 'Th', 'Jh', 'Qh', 'Kh', 'Ah']
 
-with open('game_rec4.txt') as f:
+with open('game_rec6.txt') as f:
     gameIdx = 0
-    while gameIdx < 40000:
+    while gameIdx < 60000:
         line = f.readline()
         if not line:
             break
@@ -42,20 +43,27 @@ with open('game_rec4.txt') as f:
         gs = p.GameState([p1, p2, p3], first, 'n')
 	gs2 = copy(gs)
         gs.CloseHands([1,2])
-        moveidx = randint(0, 8)
+        moveidx = randint(0, 2)
         #moveidx = 
+	#moveidx = 2
         moves = f.readline().split()
         label = 0
+	isgood = True
 	for move in moves:
             if gs.GetMoveNumber() == moveidx and gs.GetCurPlayer() == 0:
 #                label = p.EncodeMoveIndex(gs, move)
                 label = p.GetCardIndex(move)
+		if label % 8 != 0 and cardlist[label-1] in gs.Hand(0):
+			isgood = False
+		if label % 8 != 7 and cardlist[label+1] in gs.Hand(0):
+			isgood = False
                 break
 	    gs.MakeMove(move)
-        features = [a for (b,a) in p.CalcFeatures(gs, 0) if b == 'close_cards' or b == 'common_cards']
-        data.append(features)
-	labels.append(label)
-	states.append((gs, gs2, moves))
+        if isgood:
+            features = [a for (b,a) in p.CalcFeatures(gs, 0) if b == 'close_cards' or b == 'common_cards']
+            data.append(features)
+            labels.append(label)
+            states.append((gs, gs2, moves))
 
 suits = [[d[i:i+8] for i in range(0, len(d), 8)] for d in data]
 suits = [[d[i:len(suits):4] for d in suits] for i in range(0,4)]
@@ -102,7 +110,7 @@ score, acc = merge_model.evaluate([suits[0], suits[1], suits[2], suits[3]], labe
 def printhand(h):
         return ' '.join(h.ToArray())
 
-for (probs, label, (gs1, gs2, moves)) in zip(merge_model.predict([suits[0], suits[1], suits[2], suits[3]])[0:30], labels[0:30], states[0:30]):
+for (probs, label, (gs1, gs2, moves)) in zip(merge_model.predict([suits[0], suits[1], suits[2], suits[3]])[0:20], labels[0:20], states[0:20]):
 	print probs
 	print label
 	print printhand(gs1.Hand(0))

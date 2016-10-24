@@ -14,6 +14,7 @@ GameManager::GameManager(const GameManager& other) {
 
 void GameManager::SetNewLayout(const GameState& gameState, bool isOpenCards) {
 	gameState_ = gameState;
+	moveValues_.clear();
 	for (int i = 0; i < players_.size(); i++) {
 		std::vector<uint8_t> toClose;
 		for (int j = 0; j < players_.size(); j++) {
@@ -46,7 +47,9 @@ void GameManager::PlayForNMoves(uint32_t nMoves) {
 		if (dumpGames_) {
 			gameState_.Dump(cerr);
 		}
-		auto move = players_[gameState_.GetCurPlayer()]->DoMove();
+		float moveValue = 0.0f;
+		auto move = players_[gameState_.GetCurPlayer()]->DoMove(&moveValue);
+		moveValues_.push_back(moveValue);
 		PlayMove(move);
 		nMoves--;
 	}

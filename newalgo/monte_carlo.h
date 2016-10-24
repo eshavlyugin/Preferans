@@ -46,11 +46,11 @@ public:
 			xray_->MakeMove(card);
 		}
 	}
-	virtual Card DoMove() {
+	virtual Card DoMove(float* moveValue) {
 		ourHero_ = stateView_.GetCurPlayer();
 		Card result;
 		if (!useTreeSearch_) {
-			result = RunNoSearch(IsCardsOpen() ? *xray_.get() : stateView_, 2000);
+			result = RunNoSearch(IsCardsOpen() ? *xray_.get() : stateView_, 2000, moveValue);
 		} else {
 			result = RunForNSimulations(IsCardsOpen() ? *xray_.get() : stateView_, 2000);
 		}
@@ -75,7 +75,7 @@ private:
 		game = mgr.GetState();
 	}
 
-	Card RunNoSearch(const GameState& state, uint32_t numOfSimulations) {
+	Card RunNoSearch(const GameState& state, uint32_t numOfSimulations, float* moveValue) {
 		vector<GameState> states = SimpleSampler(state, numOfSimulations, first_, ourHero_, true, /*canBeInvalid*/false);
 		map<Card, float> stats;
 		for (const auto& state : states) {
@@ -90,9 +90,18 @@ private:
 			cerr << CardToString(it->first) << " " << it->second << endl;
 		}
 		state.Dump(cerr);
-		return std::max_element(stats.begin(), stats.end(), [](auto pair1, auto pair2) {
+		auto res = std::max_element(stats.begin(), stats.end(), [](auto pair1, auto pair2) {
 			return pair1.second < pair2.second;
-		})->first;
+		});
+		if (moveValue) {
+			*moveValue = 1.0f;
+			for (const auto& pair : stats) {
+				if (pair.first != res->first) {
+					*moveValue = std::min(*moveValue, 1.0f * (res->second - pair.second) / numOfSimulations);
+				}
+			}
+		}
+		return res->first;
 	}
 
 	Card RunForNSimulations(const GameState& state, uint32_t numOfSimulations) {

@@ -10,7 +10,7 @@ public:
 	virtual void OnNewLayout(const GameState& game) = 0;
 	virtual void OnNewXRayLayout(const GameState& game) = 0;
 	virtual void OnMove(Card card) = 0;
-	virtual Card DoMove() = 0;
+	virtual Card DoMove(float* moveValue = nullptr) = 0;
 	virtual shared_ptr<IPlayer> Clone() = 0;
 
 	// For training model

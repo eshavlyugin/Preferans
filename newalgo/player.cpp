@@ -23,7 +23,7 @@ public:
 	}
 	void OnNewXRayLayout(const GameState&) override final {
 	}
-	Card DoMove() override final {
+	Card DoMove(float* /*moveValue*/) override final {
 		string str;
 		bool valid = false;
 		Card res;
@@ -209,7 +209,7 @@ public:
 		}
 	}
 
-	Card DoMove() override final {
+	Card DoMove(float* /*moveValue*/) override final {
 		if (playRandom_) {
 			return MakeRandomMove();
 		}
@@ -335,11 +335,11 @@ public:
 		}
 	}
 
-	Card DoMove() override {
+	Card DoMove(float* moveValue) override {
 		float prob = 1.0 * rand() / RAND_MAX;
 		for (const auto& pair : playersAndProbs_) {
 			if (prob + 0.00001f > pair.second) {
-				return pair.first->DoMove();
+				return pair.first->DoMove(moveValue);
 			}
 			prob -= pair.second;
 		}

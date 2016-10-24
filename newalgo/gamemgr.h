@@ -16,6 +16,9 @@ public:
 	void SetDumpGames(bool value) {
 		dumpGames_ = value;
 	}
+	vector<float> GetMoveValues() const {
+		return moveValues_;
+	}
 
 	const GameState& GetState() const {
 		return gameState_;
@@ -23,6 +26,7 @@ public:
 
 private:
 	bool dumpGames_ = false;
-	std::vector<std::shared_ptr<IPlayer>> players_;
+	vector<shared_ptr<IPlayer>> players_;
+	vector<float> moveValues_;
 	GameState gameState_;
 };

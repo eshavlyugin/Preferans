@@ -22,6 +22,10 @@ void PlayLoop(const vector<std::shared_ptr<IPlayer>>& players, array<int, 3>& sc
 	        *recordFile.get() << CardToString(historyItem.card_) << " ";
 	    }
 	    *recordFile.get() << "\n";
+	    for (float moveValue : manager.GetMoveValues()) {
+	    	*recordFile.get() << moveValue << " ";
+	    }
+	    *recordFile.get() << "\n";
 	    recordFile->flush();
 	}
 }

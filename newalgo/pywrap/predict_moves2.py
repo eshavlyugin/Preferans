@@ -19,12 +19,14 @@ hidden_units = 5
 hidden_dims = 128
 batch_size = 64
 
+cardlist = ['7s', '8s', '9s', 'Ts', 'Js', 'Qs', 'Ks', 'As', '7c', '8c', '9c', 'Tc', 'Jc', 'Qc', 'Kc', 'Ac', '7d', '8d', '9d', 'Td', 'Jd', 'Qd', 'Kd', 'Ad', '7h', '8h', '9h', 'Th', 'Jh', 'Qh', 'Kh', 'Ah']
+
 data = []
 labels = []
 states = []
-with open('game_rec2.txt') as f:
+with open('game_rec6.txt') as f:
     gameIdx = 0
-    while gameIdx < 20000:
+    while gameIdx < 60000:
         line = f.readline()
         if not line:
             break
@@ -40,19 +42,25 @@ with open('game_rec2.txt') as f:
         gs = p.GameState([p1, p2, p3], first, 'n')
 	gs2 = copy(gs)
         gs.CloseHands([1,2])
-        moveidx = randint(0, 8)
-        moveidx = 0
+        moveidx = randint(0, 7)
+        #moveidx = 0
         moves = f.readline().split()
         label = 0
+	isgood = True
 	for move in moves:
             if gs.GetMoveNumber() == moveidx and gs.GetCurPlayer() == 0:
                 label = p.GetCardIndex(move)
+                if label % 8 != 0 and cardlist[label-1] in gs.Hand(0):
+                        isgood = False
+                if label % 8 != 7 and cardlist[label+1] in gs.Hand(0):
+                        isgood = False
                 break
 	    gs.MakeMove(move)
-        features = [a for (b,a) in p.CalcFeatures(gs, 0) if b == 'close_cards' or b == 'common_cards']
-        data.append(features)
-	labels.append(label)
-	states.append((gs, gs2, moves))
+        if isgood:
+            features = [a for (b,a) in p.CalcFeatures(gs, 0) if b == 'close_cards' or b == 'common_cards']
+            data.append(features)
+            labels.append(label)
+            states.append((gs, gs2, moves))
 
 print('Build model...')
 
@@ -72,13 +80,13 @@ model.compile(loss='categorical_crossentropy',
 
 print('Train...')
 
-model.fit(data, labels, batch_size=batch_size, nb_epoch=80, validation_split = 0.15, show_accuracy = True)
+model.fit(data, labels, batch_size=batch_size, nb_epoch=200, validation_split = 0.15, show_accuracy = True)
 score, acc = model.evaluate(data, labels, batch_size=batch_size)
 
 def printhand(h):
         return ' '.join(h.ToArray())
 
-for (probs, label, (gs1, gs2, moves)) in zip(model.predict(data)[0:30], labels[0:30], states[0:30]):
+for (probs, label, (gs1, gs2, moves)) in zip(model.predict(data)[0:20], labels[0:20], states[0:20]):
 	print probs
 	print label
 	print printhand(gs1.Hand(0))

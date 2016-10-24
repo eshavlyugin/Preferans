@@ -28,7 +28,7 @@ public:
 	void OnMove(Card card) override {
 		this->get_override("on_move")(card);
 	}
-	Card DoMove() override {
+	Card DoMove(float* /*moveValue*/) override {
 		bp::object res = this->get_override("do_move")();
 		return StringToCard(bp::extract<string>(res));
 	}
