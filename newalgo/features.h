@@ -72,11 +72,12 @@ private:
 public:
 	FeaturesRegistry();
 
-	FeaturesRange PlayerCards[3];
+	FeaturesRange PlayerCards[1];
 	FeaturesRange NotInGameCards;
-	FeaturesRange CardsOnDesk[3];
+	FeaturesRange CardsOnDesk[2];
 	FeaturesRange Move;
 	FeaturesRange IsGreaterCard;
+	FeaturesRange IsValidMove;
 
 	vector<FeaturesRange*> GetRangesInOrder() const;
 	FeaturesSet CreateEmptySet();
@@ -91,3 +92,4 @@ private:
 string TagToString(FeatureTag tag);
 FeaturesSet CalcFeatures(const GameState& playerView, const GameState& realState,
 		const CardsProbabilities& probArray, Card move, uint32_t ourHero);
+uint32_t EncodeMoveIndex(const GameState& playerView, Card c);

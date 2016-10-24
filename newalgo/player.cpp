@@ -89,7 +89,7 @@ public:
 			if (valid) {
 				res = MakeCard(suit, rank);
 				if (!state_.IsValidMove(res)) {
-					cout << "Invalid move " << res << endl;
+					cout << "Invalid move " << CardToString(res) << endl;
 					valid = false;
 				}
 			}
@@ -380,12 +380,12 @@ private:
 std::shared_ptr<IPlayer> CreatePlayer(const std::string& descr) {
 	if (descr == "human") {
 		return std::shared_ptr<IPlayer>(new HumanPlayer());
-	} else if (descr == "monte_carlo") {
+	} else if (descr == "monte_carlo" || descr == "monte_carlo2") {
 		vector<shared_ptr<IPlayer>> players;
 		for (uint32_t i = 0; i < 3; i++) {
 			players.push_back(CreatePlayer("random:random:random"));
 		}
-		return std::shared_ptr<IPlayer>(new MonteCarloPlayer(players, "models/expected_score.tsv"));
+		return std::shared_ptr<IPlayer>(new MonteCarloPlayer(players, "models/expected_score.tsv", descr == "monte_carlo"));
 	} else {
 		vector<string> playerParts = utils::split(descr, ';');
 		vector<pair<shared_ptr<IPlayer>, float>> players;

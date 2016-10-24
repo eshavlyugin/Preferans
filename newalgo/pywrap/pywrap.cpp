@@ -77,12 +77,16 @@ bp::list GetScoresWrap(const GameState& gameState) {
 	return result;
 }
 
-bp::list GenValidMovesWrap(const GameState& gameState) {
+bp::list CardsSetToList(const CardsSet& cs) {
 	bp::list result;
-	for (Card move : gameState.GenValidMoves()) {
+	for (Card move : cs) {
 		result.append(CardToString(move));
 	}
 	return result;
+}
+
+bp::list GenValidMovesWrap(const GameState& gameState) {
+	return CardsSetToList(gameState.GenValidMoves());
 }
 
 template<class T>
@@ -116,13 +120,14 @@ BOOST_PYTHON_MODULE(Pref_pywrap)
     bp::implicitly_convertible<Card, CardsSet>();
 
     boost::python::class_<Card>("Card", no_init)
-    		.def("__str__", &Card::operator string);
+    		.def("__str__", &CardToString);
 
     boost::python::class_<CardsSet>("CardsSet", no_init)
     		.def("__init__", bp::make_constructor(MakeCardsSet))
     		.def("__contains__", &CardsSet::IsInSet)
-			.def("__iter__", range(&CardsSet::begin, &CardsSet::end))
-			.def("Add", AddCardsSet, return_internal_reference<>());
+			.def("__iter__", bp::iterator<CardsSet>())
+			.def("Add", AddCardsSet, return_internal_reference<>())
+			.def("ToArray", CardsSetToList);
 
     boost::python::class_<GameState>("GameState", no_init)
     		.def("__init__", bp::make_constructor(MakeGameState))
@@ -134,6 +139,8 @@ BOOST_PYTHON_MODULE(Pref_pywrap)
     		.def("GetScores", GetScoresWrap)
 			.def("Hand", &GameState::Hand)
 			.def("OnDesk", &GameState::OnDesk)
+			.def("GetMoveNumber", &GameState::GetMoveNumber)
+			.def("GetCurPlayer", &GameState::GetCurPlayer)
 			.def("IsHandClosed", &GameState::IsHandClosed)
 			.def("CloseHands", &CloseHandsWrap);
 
@@ -153,4 +160,5 @@ BOOST_PYTHON_MODULE(Pref_pywrap)
     def("CalcFeatures", CalcFeaturesPy);
     def("GetCardIndex", GetCardBitWrap);
     def("GenLayout", GenLayout);
+    def("EncodeMoveIndex", EncodeMoveIndex);
 }

@@ -41,7 +41,7 @@ struct Card {
 	explicit Card(uint32_t val) { val_ = val; }
 	explicit Card(const std::string& s) { this->val_ = StringToCard(s).val_; }
 
-	operator uint32_t() const { return val_; }
+	//operator uint32_t() const { return val_; }
 	operator std::string() const { return CardToString(*this); }
 
 	bool operator == (Card other) const {
@@ -57,23 +57,17 @@ struct Card {
 		return val_ < other.val_;
 	}
 
-	uint32_t val_;
+	uint32_t val_ = 0;
 };
 
 static const Card NoCard(0);
 
-class CardsSetIterator : public iterator<input_iterator_tag, Card> {
+class CardsSetIterator : public std::iterator<input_iterator_tag, Card> {
 public:
 	CardsSetIterator(uint32_t cards) :
 		cards_(cards)
 	{
 		Shift();
-	}
-	CardsSetIterator(const CardsSetIterator& other)
-		: cards_(other.cards_)
-		, card_(other.card_)
-		, curShift_(other.curShift_)
-	{
 	}
 
 	CardsSetIterator& operator++() {
@@ -86,14 +80,17 @@ public:
 		return orig;
 	}
 
+	Card* operator->() {
+		return &card_;
+	}
 	Card& operator*() {
 		return card_;
 	}
 
-	bool operator !=(const CardsSetIterator& other) {
+	bool operator!=(const CardsSetIterator& other) const {
 		return curShift_ != other.curShift_;
 	}
-	bool operator ==(const CardsSetIterator& other) {
+	bool operator==(const CardsSetIterator& other) const {
 		return curShift_ == other.curShift_;
 	}
 
@@ -111,11 +108,14 @@ private:
 
 private:
 	Card card_;
-	uint32_t cards_;
+	uint32_t cards_ = 0;
 	uint32_t curShift_ = 0;
 };
 
 class CardsSet {
+public:
+	using iterator = CardsSetIterator;
+
 public:
 	CardsSet() :
 			cards_(0) {
@@ -143,11 +143,11 @@ public:
 	}
 
 	bool IsInSet(Card c) const {
-		return (cards_ & c) != 0;
+		return (cards_ & c.val_) != 0;
 	}
 
 	CardsSet& Remove(Card c) {
-		cards_ &= ~c;
+		cards_ &= ~c.val_;
 		return *this;
 	}
 
@@ -157,7 +157,7 @@ public:
 	}
 
 	CardsSet& Add(Card c) {
-		cards_ |= c;
+		cards_ |= c.val_;
 		return *this;
 	}
 
@@ -261,7 +261,7 @@ inline Rank CharToRank(char c) {
     }
 }
 inline bool IsValidCard(Card c) {
-	return __builtin_popcount(c) == 1;
+	return __builtin_popcount(c.val_) == 1;
 }
 
 inline Card MakeCard(Suit s, Rank r) {
@@ -269,15 +269,15 @@ inline Card MakeCard(Suit s, Rank r) {
 }
 
 inline Rank GetRank(Card c) {
-	return __builtin_ctz(c) & 7;
+	return __builtin_ctz(c.val_) & 7;
 }
 
 inline Suit GetSuit(Card c) {
-	return (Suit) (__builtin_ctz(c) >> 3);
+	return (Suit) (__builtin_ctz(c.val_) >> 3);
 }
 
 inline uint8_t GetCardBit(Card c) {
-	return __builtin_ctz(c);
+	return __builtin_ctz(c.val_);
 }
 
 inline Card CardFromBit(uint8_t bit) {

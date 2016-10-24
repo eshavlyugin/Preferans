@@ -24,9 +24,10 @@ struct MCNode {
 
 class MonteCarloPlayer : public IPlayer {
 public:
-	MonteCarloPlayer(vector<shared_ptr<IPlayer>> simulationPlayers, const string& evalModelFileName)
-		: evaluator_(evalModelFileName)
-		, players_(simulationPlayers)
+	MonteCarloPlayer(vector<shared_ptr<IPlayer>> simulationPlayers, const string& evalModelFileName, bool useTreeSearch)
+		//: evaluator_(evalModelFileName)
+		: players_(simulationPlayers)
+		, useTreeSearch_(useTreeSearch)
 	{
 	}
 
@@ -47,7 +48,12 @@ public:
 	}
 	virtual Card DoMove() {
 		ourHero_ = stateView_.GetCurPlayer();
-		auto result = RunForNSimulations(IsCardsOpen() ? *xray_.get() : stateView_, 2000);
+		Card result;
+		if (!useTreeSearch_) {
+			result = RunNoSearch(IsCardsOpen() ? *xray_.get() : stateView_, 2000);
+		} else {
+			result = RunForNSimulations(IsCardsOpen() ? *xray_.get() : stateView_, 2000);
+		}
 		cerr << "OK!" << endl;
 		return result;
 	}
@@ -67,6 +73,26 @@ private:
 		mgr.SetNewLayout(game, /*isOpenCards*/true);
 		mgr.PlayToTheEnd();
 		game = mgr.GetState();
+	}
+
+	Card RunNoSearch(const GameState& state, uint32_t numOfSimulations) {
+		vector<GameState> states = SimpleSampler(state, numOfSimulations, first_, ourHero_, true, /*canBeInvalid*/false);
+		map<Card, float> stats;
+		for (const auto& state : states) {
+			for (Card move : state.GenValidMoves()) {
+				GameState stateCopy = state;
+				stateCopy.MakeMove(move);
+				PlayToTheEnd(stateCopy);
+				stats[move] -= stateCopy.GetScores()[ourHero_];
+			}
+		}
+		for (auto it = stats.begin(); it != stats.end(); ++it) {
+			cerr << CardToString(it->first) << " " << it->second << endl;
+		}
+		state.Dump(cerr);
+		return std::max_element(stats.begin(), stats.end(), [](auto pair1, auto pair2) {
+			return pair1.second < pair2.second;
+		})->first;
 	}
 
 	Card RunForNSimulations(const GameState& state, uint32_t numOfSimulations) {
@@ -127,7 +153,7 @@ private:
 					sampleCopy.MakeMove(child->move_);
 					StateContext ctx(copy, sampleCopy, probs, NoCard, ourHero_);
 					child->n_ += 1;
-					child->sum_ -= evaluator_.CalcWeights(ctx)[0];
+					child->sum_ -= -2;//evaluator_.CalcWeights(ctx)[0];
 				}
 			}
 		}
@@ -173,9 +199,10 @@ private:
 
 private:
 	vector<shared_ptr<IPlayer>> players_;
-	ModelPredictor evaluator_;
+	//ModelPredictor evaluator_;
 	GameState stateView_;
 	shared_ptr<GameState> xray_;
 	uint32_t ourHero_ = 0;
 	uint32_t first_ = 0;
+	bool useTreeSearch_ = false;
 };
