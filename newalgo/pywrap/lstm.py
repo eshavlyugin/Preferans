@@ -13,30 +13,34 @@ from keras.layers.normalization import BatchNormalization
 from keras.optimizers import SGD
 
 batch_size = 64
-epoch_count = 75
+epoch_count = 100
+hidden_units = 64
 
-(data, labels, states) = readgames('game_rec.txt', 20000)
+(data, labels, states) = readgames('game_rec.txt', 20000, type = 'lstm')
 
 print('Build model...')
 
 data = np.array(data)
-labels = np_utils.to_categorical(labels)
+#labels = np_utils.to_categorical([la[p.GetCardIndex(card)] for la in labels])
+labels = np.array(labels)
+
+print data.shape
 model = Sequential()
-model.add(Dense(32, activation = 'softmax', input_shape = data.shape[1:]))
+model.add(LSTM(output_dim=hidden_units, input_shape=data.shape[1:], return_sequences=False, dropout_W = 0.2, dropout_U = 0.2))
+model.add(Dense(32, activation = 'sigmoid'))
 print model.summary()
 
-model.compile(loss='categorical_crossentropy',
-              optimizer='adam',
-              metrics=['accuracy'])
+model.compile(loss='binary_crossentropy',
+              optimizer='adadelta')
 
 print('Train...')
 
 model.fit(data, labels, batch_size=batch_size, nb_epoch = epoch_count, validation_split = 0.15, show_accuracy = True)
-score, acc = model.evaluate(data, labels, batch_size=batch_size)
+score = model.evaluate(data, labels, batch_size=batch_size)
 
 print_data(model, data, labels, states)
-print('Test score:', score)
-print('Test accuracy:', acc)
 
-open("model2.json", "w").write(model.to_json())
-model.save_weights("model2.h5")
+print('Test score:', score)
+
+open("model_lstm.json", "w").write(model.to_json())
+model.save_weights("model_lstm.h5")

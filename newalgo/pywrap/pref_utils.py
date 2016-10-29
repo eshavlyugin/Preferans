@@ -4,13 +4,55 @@ from copy import copy
 
 cardlist_ = ['7s', '8s', '9s', 'Ts', 'Js', 'Qs', 'Ks', 'As', '7c', '8c', '9c', 'Tc', 'Jc', 'Qc', 'Kc', 'Ac', '7d', '8d', '9d', 'Td', 'Jd', 'Qd', 'Kd', 'Ad', '7h', '8h', '9h', 'Th', 'Jh', 'Qh', 'Kh', 'Ah']
 
-def readgames(filename):
+def printhand(h):
+        return ' '.join(h.ToArray())
+
+def readgame_lstm(gs, moves, max_move_number):
+	gs2 = copy(gs)
+	features = [[], [], []] # one vector for each player
+	states = []
+	out = [0.0 for i in range(0,32)]
+	for move in moves:
+		if gs2.GetMoveNumber() > max_move_number:
+			break
+		curpl = gs2.GetCurPlayer()
+		move_f = [1.0 if i == p.GetCardIndex(move) else 0.0 for i in range(0,32)]
+		for dd in range(1,3):
+			move_f = move_f + [1.0 if i == p.GetCardIndex(gs2.OnDesk((curpl + dd) % 3)) else 0.0 for i in range(0,32)]
+		move_f += out
+		features[gs2.GetCurPlayer()] += [move_f]
+		gs2.MakeMove(move)
+		out[p.GetCardIndex(move)] = 1.0
+	labels = [[1.0 if c in gs2.Hand(pl) else 0.0 for c in cardlist_] for pl in range(0,3)]
+	return (features, labels, [(gs2.Hand(i), copy(gs), moves) for i in range(0,3)])
+
+def readgame_move(gs, moves, weights, max_move_number, min_weight):
+	data = []
+	labels = []
+	states = []
+        for (move, weight) in zip(moves, weights):
+ 	 	if gs.GetMoveNumber() > max_move_number:
+			break
+		label = p.GetCardIndex(move)
+		hand = gs.GetCurPlayer()
+				
+		if weight > min_weight:
+			gs2 = copy(gs)
+			gs2.CloseHands([i for i in range(0,3) if i != hand])
+                        features = [a for (b,a) in p.CalcFeatures(gs2, hand) if b == 'close_cards' or b == 'common_cards']
+			data.append(features)
+                        labels.append(label)
+                        states.append((gs2.Hand(i), copy(gs), moves))
+		gs.MakeMove(move)
+	return (data, labels, states)
+
+def readgames(filename, max_games = None, min_weight = 0.08, max_move_number = 5, type = 'move'):
 	data = []
 	labels = []
 	states = []
 	with open(filename) as f:
 		gameIdx = 0
-		while True:
+		while not max_games or gameIdx < max_games:
 		    gameIdx = gameIdx + 1
 		    line = f.readline()
 		    if not line:
@@ -18,49 +60,27 @@ def readgames(filename):
 		    p1 = p.CardsSet(line.split())
 		    p2 = p.CardsSet(f.readline().split())
 		    p3 = p.CardsSet(f.readline().split())
-		    union = p.CardsSet([]).Add(p1).Add(p2).Add(p3)
-		    if gameIdx % 200 == 0:
-		        print gameIdx
 		    first = int(f.readline())
-		    gs_open = p.GameState([p1, p2, p3], first, 'n')
 	            moves = f.readline().split()
         	    move_weights = [float(w) for w in f.readline().split()]
-		    for hand in range(0, 3):
-			gs = copy(gs_open)
-			to_close = [0,1,2]
-			to_close.remove(hand)
-		        gs.CloseHands(to_close)
-		        #moveidx = randint(0, 2)
-			moveidx = 0
-		        label = 0
-			isgood = True
-			for (move, weight) in zip(moves, move_weights):
-		            if gs.GetMoveNumber() == moveidx and gs.GetCurPlayer() == hand:
-		                label = p.GetCardIndex(move)
-				#if label % 8 != 0 and cardlist_[label-1] in gs.Hand(hand):
-				#	isgood = False
-				#if label % 8 != 7 and cardlist_[label+1] in gs.Hand(hand):
-				#	isgood = False
-				if weight < 0.06:
-					isgood = False
-		                break
-			    gs.MakeMove(move)
-		        if isgood:
-		            features = [a for (b,a) in p.CalcFeatures(gs, hand) if b == 'close_cards' or b == 'common_cards']
-		            data.append(features)
-        		    labels.append(label)
-	       		    states.append((gs, gs_open, moves))
+		    gs = p.GameState([p1, p2, p3], first, 'n')
+		    if gameIdx % 200 == 0:
+		        print gameIdx
+		    if type == 'move':
+			d, l, s = readgame_move(copy(gs), moves, move_weights, max_move_number, min_weight)
+		    elif type == 'lstm':
+			d, l, s = readgame_lstm(copy(gs), moves, max_move_number)
+		    data += d
+		    labels += l
+		    states += s
 	return (data, labels, states)
 
 
-def printhand(h):
-        return ' '.join(h.ToArray())
-
 def print_data(model, data, labels, states):
-	for (probs, label, (gs1, gs2, moves)) in zip(model.predict(data)[0:20], labels[0:20], states[0:20]):
+	for (probs, label, (h_cur, gs2, moves)) in zip(model.predict(data)[0:20], labels[0:20], states[0:20]):
 		print probs
 		print label
-		print printhand(gs1.Hand(0))
+		print printhand(h_cur)
 		print '******'
 		print printhand(gs2.Hand(0))
 		print printhand(gs2.Hand(1))

@@ -13,10 +13,10 @@ from keras.layers.normalization import BatchNormalization
 from keras.optimizers import SGD
 
 batch_size = 32
-epoch_count = 200
+epoch_count = 100
 #epoch_count = 10
 
-(data, labels, states) = readgames('game_rec.txt')
+(data, labels, states) = readgames('game_rec.txt', min_weight = 0.01, max_games = 18000)
 
 suits = [[d[i:i+8] for i in range(0, len(d), 8)] for d in data]
 suits = [[d[i:len(suits):4] for d in suits] for i in range(0,4)]
@@ -56,3 +56,5 @@ print_data(merge_model, [suits[0], suits[1], suits[2], suits[3]], labels, states
 print('Test score:', score)
 print('Test accuracy:', acc)
 
+open("model.json", "w").write(merge_model.to_json())
+merge_model.save_weights("model.h5")
