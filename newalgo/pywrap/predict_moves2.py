@@ -15,6 +15,8 @@ from keras.optimizers import SGD
 batch_size = 64
 epoch_count = 75
 
+#epoch_count = 10
+
 (data, labels, states) = readgames('game_rec.txt', 20000)
 
 print('Build model...')

@@ -156,11 +156,6 @@ private:
 						child = node->childs_.back().get();
 						child->move_ = move;
 					}
-					GameState copy = game;
-					GameState sampleCopy = sample;
-					copy.MakeMove(child->move_);
-					sampleCopy.MakeMove(child->move_);
-					StateContext ctx(copy, sampleCopy, probs, NoCard, ourHero_);
 					child->n_ += 1;
 					child->sum_ -= -2;//evaluator_.CalcWeights(ctx)[0];
 				}

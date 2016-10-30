@@ -197,12 +197,6 @@ public:
 
 	void OnMove(Card card) override final {
 		knownCards_[GetCardBit(card)] = 4; // out
-		if (!probsRandom_ && state_.GetCurPlayer() != ourHero_) {
-			UpdateProbabilities(card, probabilities_, cardPredictors_);
-		}
-		if (!trainProbsRandom_ && state_.GetCurPlayer() != ourHero_) {
-			UpdateProbabilities(card, trainProbabilities_, trainPredictors_);
-		}
 		state_.MakeMove(card);
 		if (xrayLayout_.get()) {
 			xrayLayout_->MakeMove(card);
@@ -228,9 +222,7 @@ public:
 			for (const auto& sampled : statesToTest) {
 				GameState copy = state_;
 				copy.MakeMove(card);
-				GameState copy2 = sampled;
-				copy2.MakeMove(card);
-				StateContext ctx(copy, copy2, probabilities_, NoCard, state_.GetCurPlayer());
+				StateContext ctx(copy, probabilities_, NoCard, state_.GetCurPlayer(), FT_Playing);
 				weight += movePredictor_->CalcWeights(ctx)[0] + copy.GetScores()[state_.GetCurPlayer()];
 			}
 			weight /= statesToTest.size();
@@ -266,24 +258,6 @@ private:
 		for (; move > 0; move--, ++it) {
 		}
 		return *it;
-	}
-
-	void UpdateProbabilities(Card move, CardsProbabilities& probabilities, const vector<shared_ptr<ModelPredictor>>& cardPredictors) {
-		StateContext ctx(state_, GameState(), probabilities, move, /*ourHero*/0);
-
-		for (uint32_t i = 0; i < 32; i++) {
-			if (knownCards_[i] != 0) {
-				for (uint32_t j = 0; j < 4; j++) {
-					probabilities[j][i] = 0.0f;
-				}
-				probabilities[knownCards_[i] - 1][i] = 1.0f;
-			} else {
-				auto probs = cardPredictors[i]->PredictProbabilities(ctx);
-				for (uint32_t j = 0; j < 4; j++) {
-					probabilities[j][i] = probs[j];
-				}
-			}
-		}
 	}
 
 private:

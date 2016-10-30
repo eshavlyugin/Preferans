@@ -1,3 +1,4 @@
+#include <boost/python/numeric.hpp>
 #include <boost/python.hpp>
 #include <boost/python/stl_iterator.hpp>
 
@@ -6,6 +7,7 @@
 #include "../gamemgr.h"
 #include "../generate.h"
 #include "../player.h"
+#include "../train_model.h"
 
 CardsSet& (CardsSet::*AddCardsSet)(CardsSet) = &CardsSet::Add;
 
@@ -59,12 +61,12 @@ GameState* MakeGameState(const bp::list& vec, uint32_t player, const std::string
 	return new GameState({bp::extract<CardsSet>(vec[0]), bp::extract<CardsSet>(vec[1]), bp::extract<CardsSet>(vec[2])}, player, CharToSuit(suit[0]));
 }
 
-bp::list CalcFeaturesPy(const GameState& gameState, uint32_t ourHero) {
+bp::list CalcFeaturesPy(const GameState& gameState, uint32_t ourHero, const Card& card, const std::string& featureType) {
 	static CardsProbabilities probs;
-	auto features = CalcFeatures(gameState, gameState, probs, NoCard, ourHero);
+	auto features = CalcFeatures(gameState, probs, card, ourHero, StringToTag(featureType));
 	bp::list result;
-	for (const auto& feature : features.GetFeatures()) {
-		result.append(bp::make_tuple(TagToString(feature.tag_), feature.value_));
+	for (float feature : features.GetFeatures()) {
+		result.append(feature);
 	}
 	return result;
 }

@@ -12,15 +12,12 @@ def readgame_lstm(gs, moves, max_move_number):
 	features = [[], [], []] # one vector for each player
 	states = []
 	out = [0.0 for i in range(0,32)]
+        max_move = randint(1, max_move_number)
 	for move in moves:
-		if gs2.GetMoveNumber() > max_move_number:
+		if gs2.GetMoveNumber() > max_move:
 			break
 		curpl = gs2.GetCurPlayer()
-		move_f = [1.0 if i == p.GetCardIndex(move) else 0.0 for i in range(0,32)]
-		for dd in range(1,3):
-			move_f = move_f + [1.0 if i == p.GetCardIndex(gs2.OnDesk((curpl + dd) % 3)) else 0.0 for i in range(0,32)]
-		move_f += out
-		features[gs2.GetCurPlayer()] += [move_f]
+		features[curpl] += [p.CalcFeatures(gs2, curpl, move, 'pos_predict')]
 		gs2.MakeMove(move)
 		out[p.GetCardIndex(move)] = 1.0
 	labels = [[1.0 if c in gs2.Hand(pl) else 0.0 for c in cardlist_] for pl in range(0,3)]
@@ -39,7 +36,7 @@ def readgame_move(gs, moves, weights, max_move_number, min_weight):
 		if weight > min_weight:
 			gs2 = copy(gs)
 			gs2.CloseHands([i for i in range(0,3) if i != hand])
-                        features = [a for (b,a) in p.CalcFeatures(gs2, hand) if b == 'close_cards' or b == 'common_cards']
+                        features = p.CalcFeatures(gs2, hand, move, 'playing')
 			data.append(features)
                         labels.append(label)
                         states.append((gs2.Hand(i), copy(gs), moves))

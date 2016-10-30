@@ -18,31 +18,17 @@ void FeaturesSet::SetUT(uint32_t pos, float value) {
 	features_.push_back(make_pair(pos, value));
 }
 
-vector<Feature> FeaturesSet::GetFeatures() const {
-	vector<Feature> result;
+vector<float> FeaturesSet::GetFeatures() const {
 	auto ranges = registry_->GetRangesInOrder();
-	for (auto range : ranges) {
-		result.insert(result.end(), range->GetLength(),
-				{ 0.0f, range->GetType() });
-	}
+	vector<float> result(registry_->GetTotal());
 	for (auto pair : features_) {
-		result[pair.first].value_ = pair.second;
+		result[pair.first] = pair.second;
 	}
 	return result;
 }
 
 vector<pair<uint32_t, float>> FeaturesSet::GetNonZeroFeatures() const {
 	return features_;
-}
-
-FeaturesRegistry::FeaturesRegistry()
-		: PlayerCards({ FeaturesRange(this, NumCardFeatures, FT_CloseCards)})
-		, NotInGameCards(this, NumCardFeatures, FT_CloseCards)
-		, CardsOnDesk({ FeaturesRange(this, NumCardFeatures, FT_CommonCards), FeaturesRange(this, NumCardFeatures, FT_CommonCards) })
-		, Move(this, NumCardFeatures, FT_Move)
-		, IsGreaterCard(this, 32, FT_CommonCards)
-		, IsValidMove(this, 32, FT_CommonCards)
-{
 }
 
 std::vector<FeaturesRange*> FeaturesRegistry::GetRangesInOrder() const {
@@ -58,6 +44,21 @@ void FeaturesRegistry::RegisterRange(FeaturesRange* range) {
 	total_ += range->GetLength();
 }
 
+PlayFeaturesRegistry::PlayFeaturesRegistry()
+	: PlayerCards({ FeaturesRange(this, NumCardFeatures, FT_Playing)})
+	, NotInGameCards(this, NumCardFeatures, FT_Playing)
+	, CardsOnDesk({ FeaturesRange(this, NumCardFeatures, FT_Playing), FeaturesRange(this, NumCardFeatures, FT_Playing) })
+	, IsGreaterCard(this, 32, FT_Playing)
+	, IsValidMove(this, 32, FT_Playing)
+{
+}
+
+PredictPosFeaturesRegistry::PredictPosFeaturesRegistry()
+	: Move(FeaturesRange(this, NumCardFeatures, FT_PosPredict))
+	, CardsOnDesk({ FeaturesRange(this, NumCardFeatures, FT_PosPredict), FeaturesRange(this, NumCardFeatures, FT_PosPredict)})
+	, NotInGameCards(FeaturesRange(this, NumCardFeatures, FT_PosPredict))
+{}
+
 FeaturesRange::FeaturesRange(FeaturesRegistry* registry, uint32_t length,
 		FeatureTag type) :
 		start_(registry->GetTotal()), length_(length), type_(type) {
@@ -66,17 +67,24 @@ FeaturesRange::FeaturesRange(FeaturesRegistry* registry, uint32_t length,
 
 string TagToString(FeatureTag tag) {
 	switch (tag) {
-	case FeatureTag::FT_Move:
-		return "move";
-	case FeatureTag::FT_CommonCards:
-		return "common_cards";
-	case FeatureTag::FT_OpenCards:
-		return "open_cards";
-	case FeatureTag::FT_CloseCards:
-		return "close_cards";
+	case FeatureTag::FT_Playing:
+		return "playing";
+	case FeatureTag::FT_PosPredict:
+		return "pos_predict";
 	default:
 		PREF_ASSERT(false);
 		return "";
+	}
+}
+
+FeatureTag StringToTag(const string& tagName) {
+	if (tagName == "playing") {
+		return FT_Playing;
+	} else if (tagName == "pos_predict") {
+		return FT_PosPredict;
+	} else {
+		PREF_ASSERT(false);
+		return FT_TypeCount;
 	}
 }
 
@@ -95,10 +103,8 @@ uint32_t EncodeMoveIndex(const GameState& playerView, Card c) {
 	return GetCardBit(MakeCard(suit, realRank));
 }
 
-FeaturesSet CalcFeatures(const GameState& playerView, const GameState& realGame,
-		const CardsProbabilities& probArray, Card move, uint32_t ourHero)
-{
-	static FeaturesRegistry reg;
+static FeaturesSet CalcPosPredictFeatures(const GameState& playerView, const CardsProbabilities& probArray, Card move, uint32_t ourHero) {
+	static PredictPosFeaturesRegistry reg;
 
 	FeaturesSet result = reg.CreateEmptySet();
 	CardsSet knownCards = playerView.GetKnownCards();
@@ -110,18 +116,45 @@ FeaturesSet CalcFeatures(const GameState& playerView, const GameState& realGame,
 		uint32_t realRank = 0;
 		for (Rank r = 0; r < 8; ++r) {
 			auto card = MakeCard(s, r);
-			/*if (playerView.Out().IsInSet(card)) {
-				continue;
-			}*/
+			auto cardForFeature = card; //MakeCard(s, realRank);
+			for (uint32_t i = 0, player = playerView.GetFirstPlayer(); i < 2; player = (player + 1) % 3, i++) {
+				if (playerView.OnDesk(player) == card) {
+					setCardF(reg.CardsOnDesk[i], cardForFeature, 1.0f);
+				}
+			}
+			if (playerView.Out().IsInSet(card)) {
+				setCardF(reg.NotInGameCards, cardForFeature, 1.0f);
+			}
+			if (move == card) {
+				setCardF(reg.Move, cardForFeature, 1.0f);
+			}
+			realRank++;
+		}
+	}
+
+	return result;
+}
+
+static FeaturesSet CalcPlayFeatures(const GameState& playerView, const CardsProbabilities& probArray, Card move, uint32_t ourHero) {
+	static PlayFeaturesRegistry reg;
+
+	FeaturesSet result = reg.CreateEmptySet();
+	CardsSet knownCards = playerView.GetKnownCards();
+	auto setCardF = [&](FeaturesRange& fr, Card c, float value) {
+		result.Set(fr, GetCardBit(c), value);
+	};
+
+	for (Suit s = Spades; s != NoSuit; s = (Suit)(uint32_t(s) + 1)) {
+		uint32_t realRank = 0;
+		for (Rank r = 0; r < 8; ++r) {
+			auto card = MakeCard(s, r);
 			auto cardForFeature = card; //MakeCard(s, realRank);
 			if (IsCardCovers(card, playerView.OnDesk(playerView.PlayerWithGreaterCard()), playerView.GetTrump())) {
 				setCardF(reg.IsGreaterCard, cardForFeature, 1.0f);
 			}
 			setCardF(reg.IsValidMove, cardForFeature, playerView.IsValidMove(card) ? 1.0f : 0.0f);
-			bool onDesk = false;
 			for (uint32_t i = 0, player = playerView.GetFirstPlayer(); i < 2; player = (player + 1) % 3, i++) {
 				if (playerView.OnDesk(player) == card) {
-					onDesk = true;
 					setCardF(reg.CardsOnDesk[i], cardForFeature, 1.0f);
 				}
 			}
@@ -133,11 +166,22 @@ FeaturesSet CalcFeatures(const GameState& playerView, const GameState& realGame,
 			}
 			realRank++;
 		}
-		/*for (Rank r = realRank; r < 8; ++r) {
-			setCardF(reg.NotInGameCards, MakeCard(s, r), 1.0f);
-		}*/
 	}
 
 	return result;
 }
 
+FeaturesSet CalcFeatures(const GameState& playerView, const CardsProbabilities& probArray, Card move, uint32_t ourHero, FeatureTag tag) {
+	switch(tag) {
+	case FT_Playing:
+		return CalcPlayFeatures(playerView, probArray, move, ourHero);
+	case FT_PosPredict:
+		return CalcPosPredictFeatures(playerView, probArray, move, ourHero);
+	default:
+		{
+			PREF_ASSERT(false);
+			FeaturesRegistry reg;
+			return reg.CreateEmptySet();
+		}
+	}
+}

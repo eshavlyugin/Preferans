@@ -5,16 +5,9 @@
 #include <bits/stdc++.h>
 
 enum FeatureTag {
-	FT_Move,
-	FT_CommonCards,
-	FT_OpenCards,
-	FT_CloseCards,
+	FT_Playing,
+	FT_PosPredict,
 	FT_TypeCount
-};
-
-struct Feature {
-	float value_ = 0.0f;
-	FeatureTag tag_ = FT_CommonCards;
 };
 
 class FeaturesSet;
@@ -27,7 +20,7 @@ class FeaturesSet {
 public:
 	void Set(const FeaturesRange& range, uint32_t pos, float value);
 	void SetUT(uint32_t pos, float value);
-	vector<Feature> GetFeatures() const;
+	vector<float> GetFeatures() const;
 	vector<pair<uint32_t, float>> GetNonZeroFeatures() const;
 
 private:
@@ -70,15 +63,6 @@ private:
 	vector<FeaturesRange*> rangesInOrder_;
 
 public:
-	FeaturesRegistry();
-
-	FeaturesRange PlayerCards[1];
-	FeaturesRange NotInGameCards;
-	FeaturesRange CardsOnDesk[2];
-	FeaturesRange Move;
-	FeaturesRange IsGreaterCard;
-	FeaturesRange IsValidMove;
-
 	vector<FeaturesRange*> GetRangesInOrder() const;
 	FeaturesSet CreateEmptySet();
 	uint32_t GetTotal() const {
@@ -89,7 +73,26 @@ private:
 	void RegisterRange(FeaturesRange* range);
 };
 
+struct PlayFeaturesRegistry : public FeaturesRegistry {
+	PlayFeaturesRegistry();
+
+	FeaturesRange PlayerCards[1];
+	FeaturesRange NotInGameCards;
+	FeaturesRange CardsOnDesk[2];
+	FeaturesRange IsGreaterCard;
+	FeaturesRange IsValidMove;
+};
+
+struct PredictPosFeaturesRegistry : public FeaturesRegistry {
+	PredictPosFeaturesRegistry();
+
+	FeaturesRange Move;
+	FeaturesRange CardsOnDesk[2];
+	FeaturesRange NotInGameCards;
+};
+
 string TagToString(FeatureTag tag);
-FeaturesSet CalcFeatures(const GameState& playerView, const GameState& realState,
-		const CardsProbabilities& probArray, Card move, uint32_t ourHero);
+FeatureTag StringToTag(const string& tagName);
+
+FeaturesSet CalcFeatures(const GameState& playerView, const CardsProbabilities& probArray, Card move, uint32_t ourHero, FeatureTag tag);
 uint32_t EncodeMoveIndex(const GameState& playerView, Card c);

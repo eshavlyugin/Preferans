@@ -10,17 +10,23 @@ from keras.layers import Dense, Dropout, Activation, Embedding, Flatten, ZeroPad
 from keras.layers import LSTM, SimpleRNN, GRU, MaxPooling1D
 from keras.layers.convolutional import Convolution1D
 from keras.layers.normalization import BatchNormalization
+from keras.preprocessing.sequence import pad_sequences
 from keras.optimizers import SGD
+
+import tensorflow as tf
+tf.python.control_flow_ops = tf
+
 
 batch_size = 64
 epoch_count = 100
-hidden_units = 64
+hidden_units = 128
+num_games = 20000
 
-(data, labels, states) = readgames('game_rec.txt', 20000, type = 'lstm')
+(data, labels, states) = readgames('game_rec.txt', num_games, type = 'lstm')
 
 print('Build model...')
 
-data = np.array(data)
+data = pad_sequences(np.array(data))
 #labels = np_utils.to_categorical([la[p.GetCardIndex(card)] for la in labels])
 labels = np.array(labels)
 
@@ -31,7 +37,8 @@ model.add(Dense(32, activation = 'sigmoid'))
 print model.summary()
 
 model.compile(loss='binary_crossentropy',
-              optimizer='adadelta')
+              optimizer='adadelta',
+              metrics=['accuracy'])
 
 print('Train...')
 

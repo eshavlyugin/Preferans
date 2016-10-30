@@ -7,8 +7,7 @@ static const uint16_t InvalidIndex = 0xffff;
 
 class StateContext {
 public:
-	StateContext(const GameState& playerView, const GameState& realGame,
-			const CardsProbabilities& probArray, Card move, uint32_t ourHero);
+	StateContext(const GameState& playerView, const CardsProbabilities& probArray, Card move, uint32_t ourHero, FeatureTag tag);
 
 	void SetMovesReward(const map<Card, float> movesReward) {
 		movesReward_ = movesReward;
@@ -61,17 +60,3 @@ private:
 	shared_ptr<IModel> model_;
 };
 
-class TrainModel {
-public:
-	void AddGameInfo(const StateContext& ctx);
-
-	void WriteTsv(ostream& ost);
-
-private:
-	void AddFeatures(const FeaturesSet& set);
-
-private:
-	vector<vector<float>> featuresArray_;
-	vector<vector<float>> actions_;
-	vector<FeatureTag> tags_;
-};

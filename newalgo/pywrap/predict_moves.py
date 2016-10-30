@@ -14,9 +14,10 @@ from keras.optimizers import SGD
 
 batch_size = 32
 epoch_count = 100
-#epoch_count = 10
+import tensorflow as tf
+tf.python.control_flow_ops = tf
 
-(data, labels, states) = readgames('game_rec.txt', min_weight = 0.01, max_games = 18000)
+(data, labels, states) = readgames('game_rec.txt', min_weight = 0.08, max_games = 20000)
 
 suits = [[d[i:i+8] for i in range(0, len(d), 8)] for d in data]
 suits = [[d[i:len(suits):4] for d in suits] for i in range(0,4)]

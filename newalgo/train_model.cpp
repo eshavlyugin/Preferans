@@ -15,7 +15,7 @@ static float sigmoid(float x) {
 	return 1.0 / (1.0 + exp(-x));
 }
 
-class NN3LayerModel : public IModel {
+/*class NN3LayerModel : public IModel {
 public:
 	NN3LayerModel(istream& ist, vector<FeatureTag> validTags) {
 		ist >> input_ >> hidden1_ >> hidden2_ >> output_;
@@ -132,19 +132,13 @@ private:
 	int input_ = 0;
 	int hidden1_ = 0;
 	int output_ = 0;
-};
+};*/
 
 
 class ModelFactory {
 public:
 	static shared_ptr<IModel> CreateModel(const std::string& model_name, istream& ist) {
-		if (model_name == "3_layer_nn") {
-			return shared_ptr<IModel>(new NN3LayerModel(ist, {FT_OpenCards, FT_CommonCards}));
-		} else if (model_name == "2_layer_nn") {
-			return shared_ptr<IModel>(new NN2LayerModel(ist, {FT_OpenCards, FT_CommonCards}));
-		} else {
-			PREF_ASSERT(false && "Unknown model name");
-		}
+		PREF_ASSERT(false && "Unknown model name");
 		return shared_ptr<IModel>(nullptr);
 	}
 };
@@ -165,13 +159,11 @@ const FeaturesSet& StateContext::GetFeatures() const {
 	return features_;
 }
 
-StateContext::StateContext(const GameState& playerView, const GameState& realGame,
-	const CardsProbabilities& probArray, Card move, uint32_t ourHero)
+StateContext::StateContext(const GameState& playerView, const CardsProbabilities& probArray, Card move, uint32_t ourHero, FeatureTag tag)
 	: playerView_(playerView)
-	, realGame_(realGame)
 	, probArray_(probArray)
 	, move_(move)
-	, features_(CalcFeatures(playerView, realGame, probArray, move, ourHero))
+	, features_(CalcFeatures(playerView, probArray, move, ourHero, tag))
 {
 }
 
@@ -217,70 +209,3 @@ vector<float> ModelPredictor::PredictProbabilities(StateContext& ctx) {
 	return weights;
 }
 
-void TrainModel::AddFeatures(const FeaturesSet& features) {
-	featuresArray_.push_back(vector<float>());
-	auto featureSet = features.GetFeatures();
-	PREF_ASSERT(tags_.size() == 0 || tags_.size() == featureSet.size());
-	tags_.resize(featureSet.size());
-	for (uint32_t i = 0; i < featureSet.size(); i++) {
-		featuresArray_.back().push_back(featureSet[i].value_);
-		tags_[i] = featureSet[i].tag_;
-	}
-}
-
-void TrainModel::AddGameInfo(const StateContext& ctx) {
-	auto features = ctx.GetFeatures();
-	const auto& realGame = ctx.GetRealGame();
-	AddFeatures(features);
-	vector<float> actionsArray;
-	auto movesReward = ctx.GetMoveReward();
-	for (uint32_t i = 0; i < 32; ++i) {
-		auto card = CardFromBit(i);
-		auto it = movesReward.find(card);
-		actionsArray.push_back(it == movesReward.end() ? 0.0f : it->second);
-	}
-	actionsArray.push_back(GetCardBit(ctx.GetMove()));
-	for (uint8_t cardBit = 0; cardBit < 32; cardBit++) {
-		auto card = CardFromBit(cardBit);
-		for (uint8_t hand = 0; hand < 4; hand++) {
-			if (hand == 3 || realGame.Hand(hand).IsInSet(card)) {
-				actionsArray.push_back(hand);
-				break;
-			}
-		}
-	}
-	actionsArray.push_back(ctx.GetPredictedScores()[0] < 1.0 / 2 ? 1 : 0);
-	actionsArray.push_back(ctx.GetPredictedScores()[0] < 0.3 ? 1 : 0);
-	actionsArray.push_back(ctx.GetPredictedScores()[0] < 1.0 / 6 ? 1 : 0);
-	actionsArray.push_back(ctx.GetPredictedScores()[0]);
-	actionsArray.push_back(ctx.GetPredictedScores()[0] * (10 - ctx.GetRealGame().GetMoveNumber()));
-	actions_.push_back(actionsArray);
-}
-
-void TrainModel::WriteTsv(ostream& ost) {
-	for (auto tag : tags_) {
-		ost << TagToString(tag) << "\t";
-	}
-
-	for (uint32_t i = 0; i < 32; i++) {
-		ost << "move_reward\t";
-	}
-	ost << "correct_move\t";
-	for (uint32_t i = 0; i < 32; i++) {
-		ost << "card" << i << "\t";
-	}
-	ost << "expected_score_2\texpected_score_3\texpected_score_6\texpected_score_norm\texpected_score\n";
-	//ost << "expected_score\n";
-
-	PREF_ASSERT(actions_[0].size() == 70 && "Wrong actions size");
-
-	for (uint32_t i = 0; i < featuresArray_.size(); i++) {
-		for (float value : featuresArray_[i]) {
-			ost << value << "\t";
-		}
-		for (auto label : actions_[i]) {
-			ost << label << "\t";
-		}
-		ost << '\n';
-	}
-}

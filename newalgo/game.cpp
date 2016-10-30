@@ -1,7 +1,9 @@
 #include "common.h"
+#include "features.h"
 #include "gamemgr.h"
 #include "generate.h"
 #include "player.h"
+#include "pymodels.h"
 
 #include <boost/program_options.hpp>
 
@@ -56,6 +58,9 @@ void PlayGames(const po::variables_map& opt) {
 
 int main(int argc, char* argv[]) {
 	srand(time(nullptr));
+	PyModels::Init(argc, argv);
+	auto model = PyModels::CreateModel("model2", FT_Playing);
+	model->Predict(CalcFeatures(GameState(), CardsProbabilities(), NoCard, 0, FT_Playing));
 	po::options_description desc("Allowed options");
 	const std::string formatDescr = "(format movePredictorsFolder:playingProbabilityPredFolder:trainingProbabilityPredFolder. In case we don't have prob folder for any of the components use random instead)";
 	desc.add_options()
