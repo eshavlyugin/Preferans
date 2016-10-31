@@ -9,18 +9,14 @@ import tensorflow as tf
 tf.python.control_flow_ops = tf
 
 batch_size = 32
-model_name = "model_lstm"
+model_name = "model2"
 model_type = "lstm" if model_name == "model_lstm" else "move"
 (data, labels, states) = readgames('game_rec9.txt', min_weight = 0.08, type = model_type)
 
 model = model_from_json(open(model_name + ".json", "r").read())
 model.load_weights(model_name + ".h5")
 if model_type == "move":
-	suits = [[d[i:i+8] for i in range(0, len(d), 8)] for d in data]
-	suits = [[d[i:len(suits):4] for d in suits] for i in range(0,4)]
 	labels = np_utils.to_categorical(labels)
-	suits = np.array(suits)
-	suits = np.array([[np.array(item).transpose() for item in s] for s in suits])
 	model.compile(loss='categorical_crossentropy',
                       optimizer='adam',
                       metrics=["accuracy"])
@@ -36,6 +32,7 @@ if model_name in set(["model", "model_deep"]):
 	score, acc = model.evaluate([suits[0], suits[1], suits[2], suits[3]], labels, batch_size=batch_size)
 	print_data(model, [suits[0], suits[1], suits[2], suits[3]], labels, states)
 elif model_name == "model2":
+	data = np.array(data)
 	score, acc = model.evaluate(data, labels, batch_size=batch_size)
 	print_data(model, data, labels, states)
 elif model_name == "model_lstm":

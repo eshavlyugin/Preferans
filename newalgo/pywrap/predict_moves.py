@@ -17,18 +17,15 @@ epoch_count = 100
 import tensorflow as tf
 tf.python.control_flow_ops = tf
 
-(data, labels, states) = readgames('game_rec.txt', min_weight = 0.08, max_games = 20000)
+(data, labels, states) = readgames('game_rec.txt', min_weight = 0.08, max_games = 20000, deep = True)
 
-suits = [[d[i:i+8] for i in range(0, len(d), 8)] for d in data]
-suits = [[d[i:len(suits):4] for d in suits] for i in range(0,4)]
 labels = np_utils.to_categorical(labels)
-suits = np.array(suits)
-suits = np.array([[np.array(item).transpose() for item in s] for s in suits])
+data = [np.array(item) for item in data]
 
 print('Build model...')
 
 models = []
-for suit_data in suits:
+for suit_data in data:
     print suit_data.shape[1:]
     model = Sequential()
     model.add(Convolution1D(6, 3, border_mode = 'same', activation = 'softmax', input_shape = suit_data.shape[1:]))
@@ -49,10 +46,10 @@ merge_model.compile(loss='categorical_crossentropy',
 
 print('Train...')
 
-merge_model.fit([suits[0], suits[1], suits[2], suits[3]], labels, batch_size=batch_size, nb_epoch=epoch_count, validation_split = 0.15, show_accuracy = True)
-score, acc = merge_model.evaluate([suits[0], suits[1], suits[2], suits[3]], labels, batch_size=batch_size)
+merge_model.fit(data, labels, batch_size=batch_size, nb_epoch=epoch_count, validation_split = 0.15, show_accuracy = True)
+score, acc = merge_model.evaluate(data, labels, batch_size=batch_size)
 
-print_data(merge_model, [suits[0], suits[1], suits[2], suits[3]], labels, states)
+print_data(merge_model, data, labels, states)
 
 print('Test score:', score)
 print('Test accuracy:', acc)

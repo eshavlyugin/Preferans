@@ -20,12 +20,17 @@ ADD_LIBRARY(PrefLib
   playout.cpp
   train_model.cpp
 )
+
 set_property(TARGET PrefLib PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
 include_directories(${PYTHON_INCLUDE_DIRS})
 
 add_executable(UnitTest common_ut.cpp layout_sample_ut.cpp model_predictor_ut.cpp players_ut.cpp run_ut.cpp)
-add_executable(TestGame game.cpp pymodels.cpp)
+add_executable(TestGame 
+  game.cpp 
+  pymodels.cpp
+)
+
 target_link_libraries(TestGame PrefLib ${CMAKE_THREAD_LIBS_INIT} ${Boost_PROGRAM_OPTIONS_LIBRARY} ${Boost_LIBRARIES} ${PYTHON_LIBRARIES})
 target_link_libraries(UnitTest PrefLib ${GTEST_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
 

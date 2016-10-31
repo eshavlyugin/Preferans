@@ -8,9 +8,7 @@
 #include "pymodels.h"
 #include "features.h"
 
-#include <boost/python.hpp>
 #include <Python.h>
-#include <numpy/ndarrayobject.h>
 #include <boost/python/numeric.hpp>
 
 namespace bp = boost::python;
@@ -31,7 +29,6 @@ public:
 
 	bp::object createKerasModel(const std::string& objName, const std::string& modelFile) {
 		std::string pyCmd = "KerasModel(\"" + modelFile + "\")";
-		cerr << "Executing " << pyCmd << endl;
 		return bp::eval(bp::str(pyCmd), main_namespace_, main_namespace_);
 	}
 
@@ -48,7 +45,6 @@ PyInterpreter& GetInterpreter() {
 static void HandlePyException() {
 	PyObject *ptype, *pvalue, *ptraceback;
 	PyErr_Fetch(&ptype, &pvalue, &ptraceback);
-	cerr << "OK" << endl;
 	bp::handle<> hType(ptype);
 	bp::object extype(hType);
 	//bp::handle<> hTraceback(ptraceback);
@@ -65,6 +61,52 @@ static void HandlePyException() {
 	//cerr << strErrorMessage << "\n" << filename << ":" << lineno << "\n" << funcname << endl;
 }
 
+boost::python::object ConvertFeatureVector(const vector<float>& vec, bool hasFirstDim) {
+	npy_intp size_f[2] = {1, vec.size()};
+	npy_intp size_nf[1] = {vec.size()};
+	npy_intp* size = hasFirstDim ? size_f : size_nf;
+
+	PyArray_SimpleNew(1, size_nf, NPY_FLOAT);
+	auto pyObj = PyArray_SimpleNew(1 + (int)hasFirstDim, size, NPY_FLOAT);
+	float *buffer = (float *) PyArray_DATA(pyObj);
+	std::memcpy(buffer, vec.data(), sizeof(float) * vec.size());
+  // create a PyObject * from pointer and data
+	boost::python::handle<> handle( pyObj );
+	boost::python::numeric::array arr( handle );
+
+  /* The problem of returning arr is twofold: firstly the user can modify
+	the data which will betray the const-correctness
+	Secondly the lifetime of the data is managed by the C++ API and not the
+	lifetime of the numpy array whatsoever. But we have a simple solution..
+   */
+
+	 return arr.copy(); // copy the object. numpy owns the copy now.
+}
+
+boost::python::object ConvertLayeredFeatureVector(const vector<float>& vec, bool hasFirstDim) {
+	PREF_ASSERT(vec.size() % 32 == 0);
+	uint32_t layerCount = vec.size() / 32;
+	npy_intp size[2] = {8, layerCount};
+
+	bp::list res;
+	for (uint32_t layer = 0; layer < 4; layer++) {
+		auto pyObj = PyArray_SimpleNew(2 + (int)hasFirstDim, size, NPY_FLOAT);
+		float *buffer = (float *) PyArray_DATA(pyObj);
+		uint32_t counter = 0;
+		for (uint32_t i = 0; i < vec.size(); i += 32) {
+			for (uint32_t j = layer * 8; j < layer * 8 + 8; j++) {
+				buffer[layerCount * j + i / 32] = vec[i + j];
+			}
+		}
+	  // create a PyObject * from pointer and data
+		bp::handle<> handle(pyObj);
+		bp::numeric::array arr(handle);
+		res.append(arr.copy());
+	}
+	return res;
+}
+
+
 class PyModel : public IModel {
 public:
 	PyModel(const std::string& modelName, FeatureTag modelType)
@@ -74,6 +116,7 @@ public:
 		auto interp = GetInterpreter();
 		try {
 			obj_ = interp.createKerasModel(modelName, modelName);
+			layered_ = bp::extract<bool>(bp::call_method<bp::object>(obj_.ptr(), "is_layered"));
 		} catch (bp::error_already_set& ) {
 			HandlePyException();
 		}
@@ -82,12 +125,16 @@ public:
 	std::vector<float> Predict(const FeaturesSet& features) override {
 		auto& interp = GetInterpreter();
 		try {
-			bp::object arrayObj = ConvertFeatureVector(features.GetFeatures());
+			bp::object arrayObj;
+			if (layered_) {
+				arrayObj = ConvertFeatureVector(features.GetFeatures(), /*hasFirstDim=*/true);
+			} else {
+				arrayObj = ConvertLayeredFeatureVector(features.GetFeatures(), /*hasFirstDim=*/true);
+			}
 			bp::object res = bp::call_method<bp::object>(obj_.ptr(), "predict", arrayObj);
 			auto np_ret = reinterpret_cast<PyArrayObject*>(res.ptr());
 			auto data = PyArray_DATA(np_ret);
 			auto size = PyArray_SHAPE(np_ret);
-			cerr << data << " " << size[1] << endl;
 			return vector<float>((float*)data, (float*)data + size[0]);
 		} catch (bp::error_already_set& err) {
 			HandlePyException();
@@ -96,32 +143,10 @@ public:
 	}
 
 private:
-	boost::python::object ConvertFeatureVector(const vector<float>& vec )
-	{
-		npy_intp size[2]{1, vec.size()};
-
-		cerr << "Size " << vec.size() << endl;
-
-		auto pyObj = PyArray_SimpleNew(2, size, NPY_FLOAT);
-		float *buffer = (float *) PyArray_DATA(pyObj);
-		std::memcpy(buffer, vec.data(), sizeof(float) * vec.size());
-	  // create a PyObject * from pointer and data
-		boost::python::handle<> handle( pyObj );
-		boost::python::numeric::array arr( handle );
-
-	  /* The problem of returning arr is twofold: firstly the user can modify
-		the data which will betray the const-correctness
-		Secondly the lifetime of the data is managed by the C++ API and not the
-		lifetime of the numpy array whatsoever. But we have a simple solution..
-	   */
-
-		 return arr.copy(); // copy the object. numpy owns the copy now.
-	}
-
-private:
 	const std::string modelName_;
 	FeatureTag modelType_;
 	bp::object obj_;
+	bool layered_ = false;
 };
 
 void Init(int argc, char** argv) {

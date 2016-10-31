@@ -1,12 +1,15 @@
 #include <boost/python/numeric.hpp>
 #include <boost/python.hpp>
 #include <boost/python/stl_iterator.hpp>
+#include <boost/python/numeric.hpp>
+#include <numpy/ndarrayobject.h>
 
 #include "../common.h"
 #include "../features.h"
 #include "../gamemgr.h"
 #include "../generate.h"
 #include "../player.h"
+#include "../pymodels.h"
 #include "../train_model.h"
 
 CardsSet& (CardsSet::*AddCardsSet)(CardsSet) = &CardsSet::Add;
@@ -61,14 +64,14 @@ GameState* MakeGameState(const bp::list& vec, uint32_t player, const std::string
 	return new GameState({bp::extract<CardsSet>(vec[0]), bp::extract<CardsSet>(vec[1]), bp::extract<CardsSet>(vec[2])}, player, CharToSuit(suit[0]));
 }
 
-bp::list CalcFeaturesPy(const GameState& gameState, uint32_t ourHero, const Card& card, const std::string& featureType) {
+bp::object CalcFeaturesPy(const GameState& gameState, uint32_t ourHero, const Card& card, const std::string& featureType, bool hasLayers) {
 	static CardsProbabilities probs;
 	auto features = CalcFeatures(gameState, probs, card, ourHero, StringToTag(featureType));
-	bp::list result;
-	for (float feature : features.GetFeatures()) {
-		result.append(feature);
+	if (hasLayers) {
+		return PyModels::ConvertLayeredFeatureVector(features.GetFeatures(), /*hasFirstDim=*/false);
+	} else {
+		return PyModels::ConvertFeatureVector(features.GetFeatures(), /*hasFirstDim=*/false);
 	}
-	return result;
 }
 
 bp::list GetScoresWrap(const GameState& gameState) {
@@ -115,6 +118,9 @@ BOOST_PYTHON_MODULE(Pref_pywrap)
     SetAssertHandler(&PyAssertHandler);
 
     srand(time(nullptr));
+
+    import_array()
+    bp::numeric::array::set_module_and_type("numpy", "ndarray");
 
     bp::implicitly_convertible<shared_ptr<PyPlayer>, shared_ptr<IPlayer>>();
     bp::implicitly_convertible<Card, std::string>();
@@ -163,4 +169,7 @@ BOOST_PYTHON_MODULE(Pref_pywrap)
     def("GetCardIndex", GetCardBitWrap);
     def("GenLayout", GenLayout);
     def("EncodeMoveIndex", EncodeMoveIndex);
+
+    scope().attr("__author__") = "Evgeny Shavlyugin";
+    scope().attr("__license__") = "MIT";
 }

@@ -12,6 +12,9 @@ from keras.layers.convolutional import Convolution1D
 from keras.layers.normalization import BatchNormalization
 from keras.optimizers import SGD
 
+import tensorflow as tf
+tf.python.control_flow_ops = tf
+
 batch_size = 64
 epoch_count = 75
 

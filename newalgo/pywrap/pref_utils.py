@@ -7,24 +7,42 @@ cardlist_ = ['7s', '8s', '9s', 'Ts', 'Js', 'Qs', 'Ks', 'As', '7c', '8c', '9c', '
 def printhand(h):
         return ' '.join(h.ToArray())
 
-def readgame_lstm(gs, moves, max_move_number):
+def _init_data(deep):
+	if deep:
+		return [[],[],[],[]]
+	else:
+		return []
+
+def _join_data(cur, item, deep, singleitem):
+	if deep:
+		for c, i in zip(cur, item):
+			if singleitem:
+				c += [i]
+			else:
+				c += i
+	else:
+		if singleitem:
+			cur += [item]
+		else:
+			cur += item
+
+def readgame_lstm(gs, moves, max_move_number, deep):
+	data = _init_data(deep)
 	gs2 = copy(gs)
-	features = [[], [], []] # one vector for each player
+	features = [_init_data(deep), _init_data(deep), _init_data(deep)] # one vector for each player
 	states = []
-	out = [0.0 for i in range(0,32)]
         max_move = randint(1, max_move_number)
 	for move in moves:
 		if gs2.GetMoveNumber() > max_move:
 			break
 		curpl = gs2.GetCurPlayer()
-		features[curpl] += [p.CalcFeatures(gs2, curpl, move, 'pos_predict')]
+		features[curpl] += [p.CalcFeatures(gs2, curpl, move, 'pos_predict', deep)]
 		gs2.MakeMove(move)
-		out[p.GetCardIndex(move)] = 1.0
 	labels = [[1.0 if c in gs2.Hand(pl) else 0.0 for c in cardlist_] for pl in range(0,3)]
 	return (features, labels, [(gs2.Hand(i), copy(gs), moves) for i in range(0,3)])
 
-def readgame_move(gs, moves, weights, max_move_number, min_weight):
-	data = []
+def readgame_move(gs, moves, weights, max_move_number, min_weight, deep):
+	data = _init_data(deep)
 	labels = []
 	states = []
         for (move, weight) in zip(moves, weights):
@@ -36,15 +54,15 @@ def readgame_move(gs, moves, weights, max_move_number, min_weight):
 		if weight > min_weight:
 			gs2 = copy(gs)
 			gs2.CloseHands([i for i in range(0,3) if i != hand])
-                        features = p.CalcFeatures(gs2, hand, move, 'playing')
-			data.append(features)
+                        features = p.CalcFeatures(gs2, hand, move, 'playing', deep)
+			_join_data(data, features, deep, True)
                         labels.append(label)
                         states.append((gs2.Hand(i), copy(gs), moves))
 		gs.MakeMove(move)
 	return (data, labels, states)
 
-def readgames(filename, max_games = None, min_weight = 0.08, max_move_number = 5, type = 'move'):
-	data = []
+def readgames(filename, max_games = None, min_weight = 0.08, max_move_number = 5, type = 'move', deep = False):
+	data = _init_data(deep)
 	labels = []
 	states = []
 	with open(filename) as f:
@@ -64,10 +82,10 @@ def readgames(filename, max_games = None, min_weight = 0.08, max_move_number = 5
 		    if gameIdx % 200 == 0:
 		        print gameIdx
 		    if type == 'move':
-			d, l, s = readgame_move(copy(gs), moves, move_weights, max_move_number, min_weight)
+			d, l, s = readgame_move(copy(gs), moves, move_weights, max_move_number, min_weight, deep)
 		    elif type == 'lstm':
-			d, l, s = readgame_lstm(copy(gs), moves, max_move_number)
-		    data += d
+			d, l, s = readgame_lstm(copy(gs), moves, max_move_number, deep)
+		    _join_data(data, d, deep, False)
 		    labels += l
 		    states += s
 	return (data, labels, states)
