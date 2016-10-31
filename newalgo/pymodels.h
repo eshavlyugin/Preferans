@@ -18,7 +18,7 @@ namespace PyModels {
 	void Init(int argc, char** argv);
 	shared_ptr<IModel> CreateModel(const std::string& modelName, FeatureTag tag);
 
-	boost::python::object ConvertFeatureVector(const vector<float>& vec, bool hasFirstDim) {
+	static boost::python::object ConvertFeatureVector(const vector<float>& vec, bool hasFirstDim) {
 		npy_intp size_f[2] = {1, vec.size()};
 		npy_intp size_nf[1] = {vec.size()};
 		npy_intp* size = hasFirstDim ? size_f : size_nf;
@@ -34,7 +34,7 @@ namespace PyModels {
 		 return arr.copy(); // copy the object. numpy owns the copy now.
 	}
 
-	boost::python::object ConvertLayeredFeatureVector(const vector<float>& vec, bool hasFirstDim) {
+	static boost::python::object ConvertLayeredFeatureVector(const vector<float>& vec, bool hasFirstDim) {
 		PREF_ASSERT(vec.size() % 32 == 0);
 		uint32_t layerCount = vec.size() / 32;
 		npy_intp size[2] = {8, layerCount};
