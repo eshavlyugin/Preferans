@@ -12,17 +12,18 @@ from keras.layers.convolutional import Convolution1D
 from keras.layers.normalization import BatchNormalization
 from keras.preprocessing.sequence import pad_sequences
 from keras.optimizers import SGD
+import json
 
 import tensorflow as tf
 tf.python.control_flow_ops = tf
 
 
 batch_size = 64
-epoch_count = 100
+epoch_count = 150
 hidden_units = 128
 num_games = 20000
 
-(data, labels, states) = readgames('game_rec.txt', num_games, type = 'lstm')
+(data, labels, states) = readgames('game_rec.txt', num_games, type = 'lstm', max_move_number = 7)
 
 print('Build model...')
 
@@ -49,5 +50,6 @@ print_data(model, data, labels, states)
 
 print('Test score:', score)
 
-open("model_lstm.json", "w").write(model.to_json())
+model_json = {"is_deep" : False, "model" : model.to_json()}
+open("model_lstm.json", "w").write(json.dumps(model_json, sort_keys = True, indent = 4))
 model.save_weights("model_lstm.h5")

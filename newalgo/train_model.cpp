@@ -159,11 +159,10 @@ const FeaturesSet& StateContext::GetFeatures() const {
 	return features_;
 }
 
-StateContext::StateContext(const GameState& playerView, const CardsProbabilities& probArray, Card move, uint32_t ourHero, FeatureTag tag)
+StateContext::StateContext(const GameState& playerView, Card move, uint32_t ourHero, FeatureTag tag)
 	: playerView_(playerView)
-	, probArray_(probArray)
 	, move_(move)
-	, features_(CalcFeatures(playerView, probArray, move, ourHero, tag))
+	, features_(CalcFeatures(playerView, move, ourHero, tag))
 {
 }
 

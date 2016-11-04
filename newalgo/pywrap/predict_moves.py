@@ -11,13 +11,14 @@ from keras.layers import LSTM, SimpleRNN, GRU, MaxPooling1D
 from keras.layers.convolutional import Convolution1D
 from keras.layers.normalization import BatchNormalization
 from keras.optimizers import SGD
+import json
 
 batch_size = 32
 epoch_count = 100
 import tensorflow as tf
 tf.python.control_flow_ops = tf
 
-(data, labels, states) = readgames('game_rec.txt', min_weight = 0.08, max_games = 20000, deep = True)
+(data, labels, states) = readgames('game_rec.txt', min_weight = 0.08, max_games = 40000, deep = True)
 
 labels = np_utils.to_categorical(labels)
 data = [np.array(item) for item in data]
@@ -54,5 +55,6 @@ print_data(merge_model, data, labels, states)
 print('Test score:', score)
 print('Test accuracy:', acc)
 
-open("model.json", "w").write(merge_model.to_json())
+model_json = {"is_deep" : True, "model" : merge_model.to_json()}
+open("model.json", "w").write(json.dumps(model_json, sort_keys = True, indent = 4))
 merge_model.save_weights("model.h5")

@@ -18,14 +18,12 @@ struct MCNode {
 	float sum_ = 0;
 	Card move_;
 	list<shared_ptr<MCNode>> childs_;
-	bool invalid_ = false;
 	vector<GameState> sampled_;
 };
 
 class MonteCarloPlayer : public IPlayer {
 public:
 	MonteCarloPlayer(vector<shared_ptr<IPlayer>> simulationPlayers, const string& evalModelFileName, bool useTreeSearch)
-		//: evaluator_(evalModelFileName)
 		: players_(simulationPlayers)
 		, useTreeSearch_(useTreeSearch)
 	{
@@ -76,7 +74,7 @@ private:
 	}
 
 	Card RunNoSearch(const GameState& state, uint32_t numOfSimulations, float* moveValue) {
-		vector<GameState> states = SimpleSampler(state, numOfSimulations, first_, ourHero_, true, /*canBeInvalid*/false);
+		vector<GameState> states = SimpleSampler(state, numOfSimulations, first_, ourHero_, true);
 		map<Card, float> stats;
 		for (const auto& state : states) {
 			for (Card move : state.GenValidMoves()) {
@@ -133,11 +131,7 @@ private:
 			if (!game.IsHandClosed(0) && !game.IsHandClosed(1) && !game.IsHandClosed(2)) {
 				node->sampled_ = {game};
 			} else {
-				node->sampled_ = SimpleSampler(game, 32, first_, ourHero_, /*playMoveHistory*/true, /*canBeInvalid*/true);
-				if (node->sampled_.size() == 0) {
-					node->invalid_ = true;
-					return false;
-				}
+				node->sampled_ = SimpleSampler(game, 32, first_, ourHero_, /*playMoveHistory*/true);
 			}
 			for (const auto& sample : node->sampled_) {
 				CardsProbabilities probs;
@@ -148,9 +142,6 @@ private:
 				PREF_ASSERT(sample.GenValidMoves().Size() != 0 && "Something wrong with sampling");
 				for (auto move : sample.GenValidMoves()) {
 					MCNode* child = nodes[GetCardBit(move)];
-					if (child && child->invalid_) {
-						continue;
-					}
 					if (!child) {
 						node->childs_.push_back(shared_ptr<MCNode>(new MCNode()));
 						child = node->childs_.back().get();
@@ -174,16 +165,13 @@ private:
 			return node->sum_ / node->n_ + C * sqrt(1e-6 + logTotal / node->n_);
 		};
 		auto child = *std::max_element(node->childs_.begin(), node->childs_.end(), [&](auto child1, auto child2) {
-			bool valid1 = sample.IsValidMove(child1->move_) && !child1->invalid_;
-			bool valid2 = sample.IsValidMove(child2->move_) && !child2->invalid_;
+			bool valid1 = sample.IsValidMove(child1->move_);
+			bool valid2 = sample.IsValidMove(child2->move_);
 			if (valid1 != valid2) {
 				return valid1 < valid2;
 			}
 			return eval(child1, log(total)) < eval(child2, log(total));
 		});
-		if (child->invalid_) {
-			return false;
-		}
 		uint32_t curPlayer = game.GetCurPlayer();
 		bool searched = true;
 		if (leaf) {

@@ -7,7 +7,7 @@ static const uint16_t InvalidIndex = 0xffff;
 
 class StateContext {
 public:
-	StateContext(const GameState& playerView, const CardsProbabilities& probArray, Card move, uint32_t ourHero, FeatureTag tag);
+	StateContext(const GameState& playerView, Card move, uint32_t ourHero, FeatureTag tag);
 
 	void SetMovesReward(const map<Card, float> movesReward) {
 		movesReward_ = movesReward;
@@ -33,7 +33,6 @@ private:
 	GameState playerView_;
 	GameState realGame_;
 	array<float, 3> scores_ = {{0.0f}};
-	CardsProbabilities probArray_;
 	map<Card, float> movesReward_;
 	Card move_;
 	FeaturesSet features_;
@@ -44,6 +43,14 @@ public:
 	virtual ~IModel() {}
 
 	virtual vector<float> Predict(const FeaturesSet& features) = 0;
+	virtual vector<float> PredictSeq(const vector<FeaturesSet>& features) = 0;
+};
+
+class IModelFactory {
+public:
+	virtual ~IModelFactory() {}
+
+	virtual shared_ptr<IModel> CreateModel(const std::string& modelName) = 0;
 };
 
 class ModelPredictor {

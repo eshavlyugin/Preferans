@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "train_model.h"
 
 class IPlayer {
 public:
@@ -15,8 +16,6 @@ public:
 
 	// For training model
 	virtual const GameState& GetStateView() const = 0;
-	virtual void GetCardProbabilities(CardsProbabilities& res) = 0;
 };
 
-std::shared_ptr<IPlayer> CreatePlayer(const std::string& descr);
-bool PlayerUsesProbabilityPrediction(const std::string& descr);
+std::shared_ptr<IPlayer> CreatePlayer(const std::string& descr, std::shared_ptr<IModelFactory> modelFactory);

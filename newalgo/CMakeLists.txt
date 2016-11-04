@@ -25,7 +25,7 @@ set_property(TARGET PrefLib PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
 include_directories(${PYTHON_INCLUDE_DIRS})
 
-add_executable(UnitTest common_ut.cpp layout_sample_ut.cpp model_predictor_ut.cpp players_ut.cpp run_ut.cpp)
+add_executable(UnitTest common_ut.cpp layout_sample_ut.cpp players_ut.cpp run_ut.cpp)
 add_executable(TestGame 
   game.cpp 
   pymodels.cpp

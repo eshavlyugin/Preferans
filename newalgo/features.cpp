@@ -103,7 +103,7 @@ uint32_t EncodeMoveIndex(const GameState& playerView, Card c) {
 	return GetCardBit(MakeCard(suit, realRank));
 }
 
-static FeaturesSet CalcPosPredictFeatures(const GameState& playerView, const CardsProbabilities& probArray, Card move, uint32_t ourHero) {
+static FeaturesSet CalcPosPredictFeatures(const GameState& playerView, Card move, uint32_t ourHero) {
 	static PredictPosFeaturesRegistry reg;
 
 	FeaturesSet result = reg.CreateEmptySet();
@@ -135,7 +135,7 @@ static FeaturesSet CalcPosPredictFeatures(const GameState& playerView, const Car
 	return result;
 }
 
-static FeaturesSet CalcPlayFeatures(const GameState& playerView, const CardsProbabilities& probArray, Card move, uint32_t ourHero) {
+static FeaturesSet CalcPlayFeatures(const GameState& playerView, Card move, uint32_t ourHero) {
 	static PlayFeaturesRegistry reg;
 
 	FeaturesSet result = reg.CreateEmptySet();
@@ -171,12 +171,12 @@ static FeaturesSet CalcPlayFeatures(const GameState& playerView, const CardsProb
 	return result;
 }
 
-FeaturesSet CalcFeatures(const GameState& playerView, const CardsProbabilities& probArray, Card move, uint32_t ourHero, FeatureTag tag) {
+FeaturesSet CalcFeatures(const GameState& playerView, Card move, uint32_t ourHero, FeatureTag tag) {
 	switch(tag) {
 	case FT_Playing:
-		return CalcPlayFeatures(playerView, probArray, move, ourHero);
+		return CalcPlayFeatures(playerView, move, ourHero);
 	case FT_PosPredict:
-		return CalcPosPredictFeatures(playerView, probArray, move, ourHero);
+		return CalcPosPredictFeatures(playerView, move, ourHero);
 	default:
 		{
 			PREF_ASSERT(false);

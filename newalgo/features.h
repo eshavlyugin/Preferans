@@ -94,5 +94,5 @@ struct PredictPosFeaturesRegistry : public FeaturesRegistry {
 string TagToString(FeatureTag tag);
 FeatureTag StringToTag(const string& tagName);
 
-FeaturesSet CalcFeatures(const GameState& playerView, const CardsProbabilities& probArray, Card move, uint32_t ourHero, FeatureTag tag);
+FeaturesSet CalcFeatures(const GameState& playerView, Card move, uint32_t ourHero, FeatureTag tag);
 uint32_t EncodeMoveIndex(const GameState& playerView, Card c);

@@ -63,9 +63,8 @@ static void HandlePyException() {
 
 class PyModel : public IModel {
 public:
-	PyModel(const std::string& modelName, FeatureTag modelType)
+	PyModel(const std::string& modelName)
 		: modelName_(modelName)
-		, modelType_(modelType)
 	{
 		auto interp = GetInterpreter();
 		try {
@@ -76,20 +75,45 @@ public:
 		}
 	}
 
+	std::vector<float> PredictSeq(const vector<FeaturesSet>& featuresSeries) override {
+		auto& interp = GetInterpreter();
+		try {
+			vector<float> features;
+			for (const auto& featureObj : featuresSeries) {
+				auto floatVec = featureObj.GetFeatures();
+				features.insert(features.end(), floatVec.begin(), floatVec.end());
+			}
+			bp::object arrayObj;
+			if (layered_) {
+				arrayObj = ConvertLayeredSeqFeatureVector(features, featuresSeries.size());
+			} else {
+				arrayObj = ConvertSeqFeatureVector(features, featuresSeries.size());
+			}
+			bp::object res = bp::call_method<bp::object>(obj_.ptr(), "predict", arrayObj);
+			auto np_ret = reinterpret_cast<PyArrayObject*>(res.ptr());
+			auto data = (float*)PyArray_DATA(np_ret);
+			auto size = PyArray_SHAPE(np_ret);
+			return vector<float>(data, data + size[1]);
+		} catch (bp::error_already_set& err) {
+			HandlePyException();
+			return vector<float>();
+		}
+	}
+
 	std::vector<float> Predict(const FeaturesSet& features) override {
 		auto& interp = GetInterpreter();
 		try {
 			bp::object arrayObj;
 			if (layered_) {
-				arrayObj = ConvertFeatureVector(features.GetFeatures(), /*hasFirstDim=*/true);
-			} else {
 				arrayObj = ConvertLayeredFeatureVector(features.GetFeatures(), /*hasFirstDim=*/true);
+			} else {
+				arrayObj = ConvertFeatureVector(features.GetFeatures(), /*hasFirstDim=*/true);
 			}
 			bp::object res = bp::call_method<bp::object>(obj_.ptr(), "predict", arrayObj);
 			auto np_ret = reinterpret_cast<PyArrayObject*>(res.ptr());
-			auto data = PyArray_DATA(np_ret);
+			auto data = (float*)PyArray_DATA(np_ret);
 			auto size = PyArray_SHAPE(np_ret);
-			return vector<float>((float*)data, (float*)data + size[0]);
+			return vector<float>(data, data + size[1]);
 		} catch (bp::error_already_set& err) {
 			HandlePyException();
 			return vector<float>();
@@ -98,7 +122,6 @@ public:
 
 private:
 	const std::string modelName_;
-	FeatureTag modelType_;
 	bp::object obj_;
 	bool layered_ = false;
 };
@@ -115,8 +138,8 @@ void Init(int argc, char** argv) {
 	}
 }
 
-std::shared_ptr<IModel> CreateModel(const std::string& modelName, FeatureTag tag) {
-	return std::shared_ptr<IModel>(new PyModel(modelName, tag));
+std::shared_ptr<IModel> PyModelFactory::CreateModel(const std::string& modelName) {
+	return shared_ptr<IModel>(new PyModel(modelName));
 }
 
 } // namespace PyModels

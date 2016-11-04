@@ -38,10 +38,11 @@ void PlayGames(const po::variables_map& opt) {
 	string player3 = opt["play3"].as<string>();
 	bool dump = player1 == "human" || player2 == "human" || player3 == "human";
 	int numGames = opt["num-games"].as<int>();
+	auto factory = shared_ptr<IModelFactory>(new PyModels::PyModelFactory());
 	std::vector<std::shared_ptr<IPlayer>> players;
-	players.push_back(CreatePlayer(player1));
-	players.push_back(CreatePlayer(player2));
-	players.push_back(CreatePlayer(player3));
+	players.push_back(CreatePlayer(player1, factory));
+	players.push_back(CreatePlayer(player2, factory));
+	players.push_back(CreatePlayer(player3, factory));
 	array<int, 3> scores = {{0}};
 	string recordFile = opt["record-games-to-file"].as<string>();
 	shared_ptr<ostream> recordFileStream;
@@ -59,15 +60,16 @@ void PlayGames(const po::variables_map& opt) {
 int main(int argc, char* argv[]) {
 	srand(time(nullptr));
 	PyModels::Init(argc, argv);
-	auto model = PyModels::CreateModel("model2", FT_Playing);
-	model->Predict(CalcFeatures(GameState(), CardsProbabilities(), NoCard, 0, FT_Playing));
+	auto factory = new PyModels::PyModelFactory();
+	auto model = factory->CreateModel("model_lstm");
+	model->PredictSeq(vector<FeaturesSet>(8, CalcFeatures(GameState(), NoCard, 0, FT_PosPredict)));
 	po::options_description desc("Allowed options");
 	const std::string formatDescr = "(format movePredictorsFolder:playingProbabilityPredFolder:trainingProbabilityPredFolder. In case we don't have prob folder for any of the components use random instead)";
 	desc.add_options()
 			("help", "produce help message")
-			("play1", po::value<string>()->default_value("random:random:random"), ("model folder for 1st player moves " + formatDescr).c_str())
-			("play2", po::value<string>()->default_value("random:random:random"), ("model folder for 2nd player moves " + formatDescr).c_str())
-			("play3", po::value<string>()->default_value("random:random:random"), ("model folder for 3rd player moves " + formatDescr).c_str())
+			("play1", po::value<string>()->default_value("random"), ("model folder for 1st player moves " + formatDescr).c_str())
+			("play2", po::value<string>()->default_value("random"), ("model folder for 2nd player moves " + formatDescr).c_str())
+			("play3", po::value<string>()->default_value("random"), ("model folder for 3rd player moves " + formatDescr).c_str())
 			("open-cards", "players are playing on open cards")
 			("num-games", po::value<int>()->default_value(1), "number of games to play")
 			("record-games-to-file", po::value<string>()->default_value(""), "Dump games to file")

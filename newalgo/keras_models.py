@@ -1,8 +1,5 @@
 import sys
-
-# TODO: find alternative solution workaround
-#sys.argv = ["./TestGame"]
-
+import json
 import numpy as np
 from keras.models import model_from_json
 from keras.utils import np_utils
@@ -14,11 +11,15 @@ class KerasModel(object):
         model_ = None
         
         def __init__(self, model_name):
-                self.model_ = model_from_json(open(model_name + ".json", "r").read())
+                json_data = json.loads(open(model_name + ".json", "r").read())
+                self.is_deep_ = json_data["is_deep"]
+                self.model_ = model_from_json(json_data["model"])
                 self.model_.load_weights(model_name + ".h5")
 
+        def is_layered(self):
+                return self.is_deep_
+        
         def predict(self, data):
-                print "hello from predict!"
-                print data
-                return self.model_.predict(data)
+                print "Prediction ", data, data.shape
+                return np.array(self.model_.predict(data), dtype=np.float32)
 

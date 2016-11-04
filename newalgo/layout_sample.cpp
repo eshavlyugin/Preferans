@@ -1,14 +1,8 @@
 #include "layout_sample.h"
 
 vector<GameState> SampleFromDistribution(const CardsProbabilities& probArray,
-	uint32_t numOfSamples, uint32_t first, Suit trump, bool canBeInvalid)
+	uint32_t numOfSamples, uint32_t first, Suit trump)
 {
-	/*for (uint32_t player = 0; player < 4; player++) {
-		for (uint32_t card = 0; card < 32; card++) {
-			cerr << probArray[player][card] << " ";
-		}
-		cerr << endl;
-	}*/
 	float dp[11][11][11][3] = { 0.0f };
 	dp[0][0][0][0] = 1.0f;
 	for (uint32_t p1 = 0; p1 <= 10; p1++) {
@@ -37,9 +31,6 @@ vector<GameState> SampleFromDistribution(const CardsProbabilities& probArray,
 		}
 	}
 
-	if (canBeInvalid && dp[10][10][10][2] < 1e-11f) {
-		return vector<GameState>();
-	}
 	PREF_ASSERT(dp[10][10][10][2] > 1e-11f);
 	// sampling
 	vector<GameState> result;
@@ -55,9 +46,6 @@ vector<GameState> SampleFromDistribution(const CardsProbabilities& probArray,
 			probs[2] = rem[2] > 0 ? (dp[rem[0]][rem[1]][rem[2] - 1][widow] * probArray[2][bit]) : 0.0f;
 			probs[3] = widow > 0 ? (dp[rem[0]][rem[1]][rem[2]][widow - 1] * probArray[3][bit]) : 0.0f;
 			float sum = probs[0] + probs[1] + probs[2] + probs[3];
-			if (canBeInvalid && sum < 1e-20f) {
-				return vector<GameState>();
-			}
 			PREF_ASSERT(sum > 1e-20f);
 			float rnd = sum * rand() / RAND_MAX;
 			rnd = std::min(rnd, sum * 0.999999f);
@@ -80,21 +68,16 @@ vector<GameState> SampleFromDistribution(const CardsProbabilities& probArray,
 	return result;
 }
 
-vector<GameState> SimpleSampler(const GameState& state, uint32_t numOfSamples, uint32_t firstPlayer, uint32_t ourHero, bool playMoveHistory, bool canBeInvalid) {
+vector<GameState> SimpleSampler(const GameState& state, uint32_t numOfSamples, uint32_t firstPlayer, uint32_t ourHero, bool playMoveHistory) {
 	//state.Dump(cerr);
 	//cerr << ourHero << " " << firstPlayer << endl;
 	CardsProbabilities probs = {{0.0f}};
 	CardsSet out;
-	CardsSet notForCurPlayer;
 	vector<CardsSet> hands(3);
 	for (auto card : state.Hand(ourHero)) {
-		if (ourHero == state.GetCurPlayer()) {
-			out.Add(card);
-			hands[ourHero].Add(card);
-			probs[ourHero][GetCardBit(card)] = 1.0f;
-		} else {
-			notForCurPlayer.Add(card);
-		}
+		out.Add(card);
+		hands[ourHero].Add(card);
+		probs[ourHero][GetCardBit(card)] = 1.0f;
 	}
 	for (const auto& moveData : state.GetMoveHistory()) {
 		out.Add(moveData.card_);
@@ -109,18 +92,18 @@ vector<GameState> SimpleSampler(const GameState& state, uint32_t numOfSamples, u
 		auto suit = GetSuit(card);
 		uint32_t total = 2;
 		for (uint32_t player = 0; player < 3; player++) {
-			if (!state.IsSuitOut(player, suit) && !(notForCurPlayer.IsInSet(card) && player == state.GetCurPlayer())) {
+			if (!state.IsSuitOut(player, suit) && player != ourHero) {
 				total += 10 - hands[player].Size();
 			}
 		}
 		for (uint32_t player = 0; player < 3; player++) {
-			if (!state.IsSuitOut(player, suit) && !(notForCurPlayer.IsInSet(card) && player == state.GetCurPlayer())) {
+			if (!state.IsSuitOut(player, suit) && player != ourHero) {
 				probs[player][bit] = 1.0f * (10 - hands[player].Size()) / total;
 			}
 		}
 		probs[3][bit] = 2.0 / total;
 	}
-	vector<GameState> result = SampleFromDistribution(probs, numOfSamples, firstPlayer, NoSuit, canBeInvalid);
+	vector<GameState> result = SampleFromDistribution(probs, numOfSamples, firstPlayer, NoSuit);
 	if (playMoveHistory) {
 		for (GameState& stateToReturn : result) {
 			for (const auto& moveData : state.GetMoveHistory()) {

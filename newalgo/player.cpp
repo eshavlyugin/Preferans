@@ -96,9 +96,6 @@ public:
 		}
 		return res;
 	}
-	void GetCardProbabilities(array<array<float, 32>, 4>& res) override {
-	}
-
 	const GameState& GetStateView() const override {
 		return state_;
 	}
@@ -152,29 +149,13 @@ inline void FillRandomProbabilityArray(const GameState& state,
 
 class AiPlayer: public IPlayer {
 public:
-	void SetMovePredictor(const string& movePredictorModelFile) {
+	void SetMovePredictor(shared_ptr<IModel> model) {
 		playRandom_ = false;
-		movePredictor_.reset(new ModelPredictor(movePredictorModelFile));
-	}
-
-	void SetCardPredictors(const vector<string>& cardPredictorModelFiles) {
-		probsRandom_ = false;
-		for (auto& modelFile : cardPredictorModelFiles) {
-			cardPredictors_.emplace_back(
-					shared_ptr<ModelPredictor>(new ModelPredictor(modelFile)));
-		}
+		movePredictor_ = model;
 	}
 
 	void OnNewXRayLayout(const GameState& game) override {
 		xrayLayout_.reset(new GameState(game));
-	}
-
-	void SetTrainCardPredictors(const vector<string>& cardPredictorModelFiles) {
-		trainProbsRandom_ = false;
-		for (auto& modelFile : cardPredictorModelFiles) {
-			trainPredictors_.emplace_back(
-					shared_ptr<ModelPredictor>(new ModelPredictor(modelFile)));
-		}
 	}
 
 	void OnNewLayout(const GameState& state) override final {
@@ -186,12 +167,6 @@ public:
 			}
 		}
 		fill(knownCards_.begin(), knownCards_.end(), 0);
-		if (!probsRandom_) {
-			FillRandomProbabilityArray(state, knownCards_, probabilities_);
-		}
-		if (!trainProbsRandom_) {
-			FillRandomProbabilityArray(state, knownCards_, trainProbabilities_);
-		}
 		FillKnownCardsArray(state_, knownCards_);
 	}
 
@@ -207,39 +182,18 @@ public:
 		if (playRandom_) {
 			return MakeRandomMove();
 		}
-		GetCardProbabilities(probabilities_);
 		auto valid = state_.GenValidMoves();
+		auto weights = movePredictor_->Predict(CalcFeatures(state_, NoCard, ourHero_, FT_Playing));
 		Card bestMove = NoCard;
-		float best = 1e10f;
-		vector<GameState> statesToTest;
-		if (xrayLayout_.get()) {
-			statesToTest.push_back(*xrayLayout_.get());
-		} else {
-			statesToTest = SimpleSampler(state_, 5, firstPlayer_, ourHero_, /*playMoveHistory=*/true, /*canBeInvalid*/false);
-		}
+		float best = -1e10f;
 		for (auto card : valid) {
-			float weight = 0.0f;
-			for (const auto& sampled : statesToTest) {
-				GameState copy = state_;
-				copy.MakeMove(card);
-				StateContext ctx(copy, probabilities_, NoCard, state_.GetCurPlayer(), FT_Playing);
-				weight += movePredictor_->CalcWeights(ctx)[0] + copy.GetScores()[state_.GetCurPlayer()];
-			}
-			weight /= statesToTest.size();
-			if (best > weight) {
+			auto weight = weights[GetCardBit(card)];
+			if (best < weight) {
 				best = weight;
 				bestMove = card;
 			}
 		}
 		return bestMove;
-	}
-
-	void GetCardProbabilities(CardsProbabilities& res) override {
-		if (trainProbsRandom_) {
-			FillRandomProbabilityArray(state_, knownCards_, res);
-		} else {
-			res = trainProbabilities_;
-		}
 	}
 
 	shared_ptr<IPlayer> Clone() override {
@@ -263,18 +217,12 @@ private:
 private:
 	GameState state_;
 	shared_ptr<GameState> xrayLayout_;
-	shared_ptr<ModelPredictor> movePredictor_;
+	shared_ptr<IModel> movePredictor_;
 	array<uint8_t, 32> knownCards_ = {{0}};
 	uint32_t ourHero_ = 0;
 	uint32_t firstPlayer_ = 0;
-	vector<shared_ptr<ModelPredictor>> cardPredictors_;
-	vector<shared_ptr<ModelPredictor>> trainPredictors_;
-	CardsProbabilities probabilities_;
-	CardsProbabilities trainProbabilities_;
 
 	bool playRandom_ = true;
-	bool probsRandom_ = true;
-	bool trainProbsRandom_ = true;
 };
 
 class CompositePlayer : public IPlayer {
@@ -334,69 +282,38 @@ public:
 		return playersAndProbs_[0].first->GetStateView();
 	}
 
-	void GetCardProbabilities(CardsProbabilities& res) override {
-		res = CardsProbabilities({{0.0f}});
-		for (const auto& pair : playersAndProbs_) {
-			CardsProbabilities tmp;
-			pair.first->GetCardProbabilities(tmp);
-			for (uint32_t i = 0; i < res.size(); ++i){
-				for (uint32_t j = 0; j < res[0].size(); ++j) {
-					res[i][j] += tmp[i][j] * pair.second;
-				}
-			}
-		}
-	}
-
 private:
 	vector<pair<shared_ptr<IPlayer>, float>> playersAndProbs_;
 };
 
-std::shared_ptr<IPlayer> CreatePlayer(const std::string& descr) {
+std::shared_ptr<IPlayer> CreatePlayer(const std::string& descr, std::shared_ptr<IModelFactory> modelFactory) {
 	if (descr == "human") {
 		return std::shared_ptr<IPlayer>(new HumanPlayer());
 	} else if (descr == "monte_carlo" || descr == "monte_carlo2") {
 		vector<shared_ptr<IPlayer>> players;
 		for (uint32_t i = 0; i < 3; i++) {
-			players.push_back(CreatePlayer("random:random:random"));
+			players.push_back(CreatePlayer("random", modelFactory));
 		}
 		return std::shared_ptr<IPlayer>(new MonteCarloPlayer(players, "models/expected_score.tsv", descr == "monte_carlo"));
 	} else {
-		vector<string> playerParts = utils::split(descr, ';');
+		vector<string> playerParts = utils::split(descr, ',');
 		vector<pair<shared_ptr<IPlayer>, float>> players;
 		for (const auto& playerPart : playerParts) {
 			players.push_back(pair<shared_ptr<IPlayer>, float>());
 			auto& pair = players.back();
-			vector<string> descrAndProb = utils::split(playerPart, ',');
+			vector<string> descrAndProb = utils::split(playerPart, ';');
 			if (descrAndProb.size() == 1) {
 				pair.second = 1.0f;
 			} else if (descrAndProb.size() == 2) {
 				pair.second = std::stod(descrAndProb[1]);
 			} else {
-				PREF_ASSERT(false && "Expected in format descr,weight");
+				PREF_ASSERT(false && "Expected in format descr;weight");
 			}
-			vector<string> parts = utils::split(descrAndProb[0], ':');
-			PREF_ASSERT(parts.size() == 3 && "player description is expected in format play:probsWorking:probsForTrain");
-			const string& playFolder = parts[0];
-			const string& probsFolder = parts[1];
-			const string& probsTrainFolder = parts[2];
 
+			auto modelName = descrAndProb[0];
 			AiPlayer* player(new AiPlayer());
-			if (playFolder != "random") {
-				player->SetMovePredictor(playFolder + "/expected_score.tsv");
-			}
-			if (probsFolder != "random") {
-				vector<string> cardProbFiles;
-				for (int i = 0; i < 32; ++i) {
-					cardProbFiles.push_back(probsFolder + "/card" + std::to_string(i) + ".tsv");
-				}
-				player->SetCardPredictors(cardProbFiles);
-			}
-			if (probsTrainFolder != "random") {
-				vector<string> cardProbFiles;
-				for (int i = 0; i < 32; ++i) {
-					cardProbFiles.push_back(probsTrainFolder + "/card" + std::to_string(i) + ".tsv");
-				}
-				player->SetTrainCardPredictors(cardProbFiles);
+			if (modelName != "random") {
+				player->SetMovePredictor(modelFactory->CreateModel(modelName));
 			}
 			pair.first = shared_ptr<IPlayer>(player);
 		}
@@ -408,15 +325,4 @@ std::shared_ptr<IPlayer> CreatePlayer(const std::string& descr) {
 		}
 	}
 }
-
-bool PlayerUsesProbabilityPrediction(const std::string& descr) {
-	vector<string> parts = utils::split(descr, ':');
-	if (parts.size() != 3) {
-		return false;
-	}
-	cerr << "UseProbabilityPrediction = " << (parts[2] != "random") << endl;
-	return parts[2] != "random";
-}
-
-
 

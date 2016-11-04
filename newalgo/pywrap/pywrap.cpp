@@ -45,9 +45,6 @@ public:
 		static GameState dummy;
 		return dummy;
 	}
-	void GetCardProbabilities(CardsProbabilities&) override {
-		PREF_ASSERT(false && "data gathering is supported only in c++ not in the python code");
-	}
 };
 
 CardsSet* MakeCardsSet(bp::object& o) {
@@ -65,8 +62,7 @@ GameState* MakeGameState(const bp::list& vec, uint32_t player, const std::string
 }
 
 bp::object CalcFeaturesPy(const GameState& gameState, uint32_t ourHero, const Card& card, const std::string& featureType, bool hasLayers) {
-	static CardsProbabilities probs;
-	auto features = CalcFeatures(gameState, probs, card, ourHero, StringToTag(featureType));
+	auto features = CalcFeatures(gameState, card, ourHero, StringToTag(featureType));
 	if (hasLayers) {
 		return PyModels::ConvertLayeredFeatureVector(features.GetFeatures(), /*hasFirstDim=*/false);
 	} else {

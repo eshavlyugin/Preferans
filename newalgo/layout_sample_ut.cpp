@@ -35,14 +35,14 @@ TEST (LayoutSamplingTest, GenerateSimpleLayout) {
 	for (uint32_t iter = 0; iter < 100; iter++) {
 		GameState gameState = GenLayout();
 		vector<shared_ptr<IPlayer>> players = {
-			CreatePlayer("random:random:random"),
-			CreatePlayer("random:random:random"),
-			CreatePlayer("random:random:random")
+			CreatePlayer("random", nullptr),
+			CreatePlayer("random", nullptr),
+			CreatePlayer("random", nullptr)
 		};
 		GameManager manager(players);
 		manager.SetNewLayout(gameState, /*openCards=*/true);
 		manager.PlayForNMoves(15);
-		auto newLayouts = SimpleSampler(manager.GetState(), 5, gameState.GetFirstPlayer(), 0, /*playMoveHistory=*/false, /*canBeInvalid*/false);
+		auto newLayouts = SimpleSampler(manager.GetState(), 5, gameState.GetFirstPlayer(), 0, /*playMoveHistory=*/false);
 		for (const auto& newLayout : newLayouts) {
 			// 2. If suit is out for some player, cards of suit in sampled layout must be the same
 			// 3. Moves in history must be in the player hands
