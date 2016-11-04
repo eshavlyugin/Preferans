@@ -17,8 +17,8 @@ struct MCNode {
 	int n_ = 0;
 	float sum_ = 0;
 	Card move_;
-	list<shared_ptr<MCNode>> childs_;
-	vector<GameState> sampled_;
+	std::array<shared_ptr<MCNode>, 32> childs_ = {{nullptr}};
+	shared_ptr<LayoutSampler> sampler_;
 };
 
 class MonteCarloPlayer : public IPlayer {
@@ -74,11 +74,12 @@ private:
 	}
 
 	Card RunNoSearch(const GameState& state, uint32_t numOfSimulations, float* moveValue) {
-		vector<GameState> states = SimpleSampler(state, numOfSimulations, first_, ourHero_, true);
+		LayoutSampler sampler(state, first_, ourHero_);
 		map<Card, float> stats;
-		for (const auto& state : states) {
-			for (Card move : state.GenValidMoves()) {
-				GameState stateCopy = state;
+		for (uint32_t i = 0; i < numOfSimulations; ++i) {
+			vector<GameState> state = sampler.DoSample(1, /*playMoveHistory*/true);
+			for (Card move : state[0].GenValidMoves()) {
+				GameState stateCopy = state[0];
 				stateCopy.MakeMove(move);
 				PlayToTheEnd(stateCopy);
 				stats[move] -= stateCopy.GetScores()[ourHero_];
@@ -108,11 +109,15 @@ private:
 			GameState copy = state;
 			DoSearch(root, copy);
 		}
+		vector<shared_ptr<MCNode>> notNull;
 		for (auto elem : root->childs_) {
-			cerr << CardToString(elem->move_) << " " << elem->n_ << " " << elem->sum_ << endl;
+			if (elem != nullptr) {
+				cerr << CardToString(elem->move_) << " " << elem->n_ << " " << elem->sum_ << endl;
+				notNull.push_back(elem);
+			}
 		}
 		state.Dump(cerr);
-		return (*(std::max_element(root->childs_.begin(), root->childs_.end(), [](auto child1, auto child2) {
+		return (*(std::max_element(notNull.begin(), notNull.end(), [](auto child1, auto child2) {
 			return child1->sum_ * child2->n_ < child2->sum_ * child1->n_;
 		})))->move_;
 	}
@@ -121,72 +126,51 @@ private:
 		return xray_.get();
 	}
 
-	bool DoSearch(shared_ptr<MCNode> node, GameState& game) {
+	void DoSearch(shared_ptr<MCNode> node, GameState& game) {
 		if (game.GetMoveNumber() == 10) {
-			return true;
+			return;
 		}
 		// leaf node
 		bool leaf = node->childs_.size() == 0;
-		if (node->sampled_.size() == 0) {
-			if (!game.IsHandClosed(0) && !game.IsHandClosed(1) && !game.IsHandClosed(2)) {
-				node->sampled_ = {game};
-			} else {
-				node->sampled_ = SimpleSampler(game, 32, first_, ourHero_, /*playMoveHistory*/true);
-			}
-			for (const auto& sample : node->sampled_) {
-				CardsProbabilities probs;
-				array<MCNode*, 32> nodes = {{nullptr}};
-				for (const auto child : node->childs_) {
-					nodes[GetCardBit(child->move_)] = child.get();
-				}
-				PREF_ASSERT(sample.GenValidMoves().Size() != 0 && "Something wrong with sampling");
-				for (auto move : sample.GenValidMoves()) {
-					MCNode* child = nodes[GetCardBit(move)];
-					if (!child) {
-						node->childs_.push_back(shared_ptr<MCNode>(new MCNode()));
-						child = node->childs_.back().get();
-						child->move_ = move;
-					}
-					child->n_ += 1;
-					child->sum_ -= -2;//evaluator_.CalcWeights(ctx)[0];
-				}
-			}
+		if (node->sampler_.get() == nullptr) {
+			node->sampler_.reset(new LayoutSampler(game, first_, ourHero_));
 		}
-		const GameState& sample = node->sampled_[rand() % node->sampled_.size()];
-
-		int total = 0;
-		for (auto child : node->childs_) {
-			if (sample.IsValidMove(child->move_)) {
-				total += child->n_;
+		vector<GameState> sample = node->sampler_->DoSample(1, true);
+		uint32_t total = 0;
+		for (const auto card : sample[0].GenValidMoves()) {
+			auto bit = GetCardBit(card);
+			auto child = node->childs_[bit];
+			if (child == nullptr) {
+				child.reset(new MCNode());
+				node->childs_[bit] = child;
+				child->move_ = card;
+				child->n_ = 1;
+				child->sum_ = -2;
 			}
+			total += child->n_;
 		}
 		static const float C = 3.8;
+		auto logTotal = log(total);
 		auto eval = [](shared_ptr<MCNode> node, float logTotal) {
 			return node->sum_ / node->n_ + C * sqrt(1e-6 + logTotal / node->n_);
 		};
-		auto child = *std::max_element(node->childs_.begin(), node->childs_.end(), [&](auto child1, auto child2) {
-			bool valid1 = sample.IsValidMove(child1->move_);
-			bool valid2 = sample.IsValidMove(child2->move_);
-			if (valid1 != valid2) {
-				return valid1 < valid2;
+		shared_ptr<MCNode> bestChild = nullptr;
+		for (const auto card : sample[0].GenValidMoves()) {
+			auto child = node->childs_[GetCardBit(card)];
+			if (bestChild == nullptr || eval(bestChild, logTotal) < eval(child, logTotal)) {
+				bestChild = child;
 			}
-			return eval(child1, log(total)) < eval(child2, log(total));
-		});
+		}
 		uint32_t curPlayer = game.GetCurPlayer();
-		bool searched = true;
 		if (leaf) {
-			game = sample;
-			game.MakeMove(child->move_);
-			PlayToTheEnd(game);
+			sample[0].MakeMove(bestChild->move_);
+			PlayToTheEnd(sample[0]);
 		} else {
-			game.MakeMove(child->move_);
-			searched = DoSearch(child, game);
+			game.MakeMove(bestChild->move_);
+			DoSearch(bestChild, game);
 		}
-		if (searched) {
-			child->n_++;
-			child->sum_ -= game.GetScores()[curPlayer];
-		}
-		return searched;
+		bestChild->n_++;
+		bestChild->sum_ -= game.GetScores()[curPlayer];
 	}
 
 private:
