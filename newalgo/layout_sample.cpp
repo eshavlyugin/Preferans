@@ -5,38 +5,96 @@ LayoutSampler::LayoutSampler(const GameState& state, uint32_t firstPlayer, uint3
 	, trump_(state.GetTrump())
 	, state_(state)
 {
-	CardsSet out;
+	for (uint32_t i = 0; i < 3; ++i) {
+		std::fill(probArray_[i].begin(), probArray_[i].end(), 1.0f);
+	}
+	InitProbsArray();
+	InitDpArray();
+}
+
+LayoutSampler::LayoutSampler(const GameState& state, uint32_t firstPlayer, uint32_t ourHero, const CardsProbabilities& probsArray)
+	: first_(firstPlayer)
+	, trump_(state.GetTrump())
+	, state_(state)
+	, ourHero_(ourHero)
+	, probArray_(probsArray)
+{
+	InitProbsArray();
+	InitDpArray();
+}
+
+void LayoutSampler::InitProbsArray() {
 	vector<CardsSet> hands(3);
-	for (auto card : state.Hand(ourHero)) {
-		out.Add(card);
-		hands[ourHero].Add(card);
-		probArray_[ourHero][GetCardBit(card)] = 1.0f;
+	std::fill(probArray_[ourHero_].begin(), probArray_[ourHero_].end(), 0.0f);
+	for (auto card : state_.Hand(ourHero_)) {
+		hands[ourHero_].Add(card);
+		for (uint32_t i = 0; i < 4; ++i) {
+			probArray_[i][GetCardBit(card)] = i == ourHero_ ? 1.0f : 0.0f;
+		}
 	}
-	for (const auto& moveData : state.GetMoveHistory()) {
-		out.Add(moveData.card_);
+	for (const auto& moveData : state_.GetMoveHistory()) {
 		hands[moveData.player_].Add(moveData.card_);
-		probArray_[moveData.player_][GetCardBit(moveData.card_)] = 1.0f;
+		for (uint32_t i = 0; i < 4; ++i) {
+			probArray_[i][GetCardBit(moveData.card_)] = i == moveData.player_ ? 1.0f : 0.0f;
+		}
 	}
-	for (uint32_t bit = 0; bit < 32; bit++) {
-		auto card = CardFromBit(bit);
-		if (out.IsInSet(card)) {
+	array<float, 4> sums = {0.0f};
+	CardsSet out;
+	out.Add(hands[0]).Add(hands[1]).Add(hands[2]);
+	for (uint32_t player = 0; player < 3; player++) {
+		if (player == ourHero_) {
 			continue;
 		}
-		auto suit = GetSuit(card);
-		uint32_t total = 2;
-		for (uint32_t player = 0; player < 3; player++) {
-			if (!state.IsSuitOut(player, suit) && player != ourHero) {
-				total += 10 - hands[player].Size();
+		for (uint32_t bit = 0; bit < 32; bit++) {
+			auto card = CardFromBit(bit);
+			if (out.IsInSet(card) || state_.IsSuitOut(player, GetSuit(card))) {
+				continue;
 			}
+			sums[player] += probArray_[player][bit];
 		}
-		for (uint32_t player = 0; player < 3; player++) {
-			if (!state.IsSuitOut(player, suit) && player != ourHero) {
-				probArray_[player][bit] = 1.0f * (10 - hands[player].Size()) / total;
-			}
-		}
-		probArray_[3][bit] = 2.0 / total;
 	}
+	for (uint32_t player = 0; player < 3; player++) {
+		if (player == ourHero_) {
+			continue;
+		}
+		for (uint32_t bit = 0; bit < 32; ++bit) {
+			auto card = CardFromBit(bit);
+			if (out.IsInSet(card)) {
+				continue;
+			}
+			if (state_.IsSuitOut(player, GetSuit(card))) {
+				probArray_[player][bit] = 0.0f;
+			}
+			if (sums[player] > 1e-8) {
+				probArray_[player][bit] *= (10 - hands[player].Size()) / sums[player];
+			}
+		}
+	}
+	for (uint32_t i = 0; i < 32; i++) {
+		if (!out.IsInSet(CardFromBit(i))) {
+			probArray_[3][i] = 1.0f / (probArray_[0][i] + probArray_[1][i] + probArray_[2][i] + 0.001f);
+		} else {
+			probArray_[3][i] = 0.0f;
+		}
+		sums[3] += probArray_[3][i];
+	}
+	for (uint32_t i = 0; i < 32; i++) {
+		probArray_[3][i] *= 2.0f / sums[3];
+	}
+	//state_.Dump(cerr);
+	for (uint32_t j = 0; j < 32; j++) {
+		float prob = probArray_[0][j] + probArray_[1][j] + probArray_[2][j] + probArray_[3][j];
+		//cerr << out.IsInSet(CardFromBit(j)) << " ";
+		for (uint32_t i = 0; i < 4; i++) {
+			probArray_[i][j] /= prob;
+			PREF_ASSERT(prob > 1e-8f);
+			//cerr << probArray_[i][j] << " ";
+		}
+		//cerr << endl;
+	}
+}
 
+void LayoutSampler::InitDpArray() {
 	dp_[0][0][0][0] = 1.0f;
 	for (uint32_t p1 = 0; p1 <= 10; p1++) {
 		for (uint32_t p2 = 0; p2 <= 10; p2++) {

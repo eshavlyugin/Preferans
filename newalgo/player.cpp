@@ -294,7 +294,7 @@ std::shared_ptr<IPlayer> CreatePlayer(const std::string& descr, std::shared_ptr<
 		for (uint32_t i = 0; i < 3; i++) {
 			players.push_back(CreatePlayer("random", modelFactory));
 		}
-		return std::shared_ptr<IPlayer>(new MonteCarloPlayer(players, "models/expected_score.tsv", descr == "monte_carlo"));
+		return std::shared_ptr<IPlayer>(new MonteCarloPlayer(players, modelFactory->CreateModel("model_lstm"), descr == "monte_carlo"));
 	} else {
 		vector<string> playerParts = utils::split(descr, ',');
 		vector<pair<shared_ptr<IPlayer>, float>> players;

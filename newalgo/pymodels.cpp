@@ -70,6 +70,7 @@ public:
 		try {
 			obj_ = interp.createKerasModel(modelName, modelName);
 			layered_ = bp::extract<bool>(bp::call_method<bp::object>(obj_.ptr(), "is_layered"));
+			timeSteps_ = bp::extract<uint32_t>(bp::call_method<bp::object>(obj_.ptr(), "time_steps"));
 		} catch (bp::error_already_set& ) {
 			HandlePyException();
 		}
@@ -78,16 +79,21 @@ public:
 	std::vector<float> PredictSeq(const vector<FeaturesSet>& featuresSeries) override {
 		auto& interp = GetInterpreter();
 		try {
+			if (featuresSeries.size() == 0) {
+				return vector<float>(32, 1.0f);
+			}
 			vector<float> features;
 			for (const auto& featureObj : featuresSeries) {
 				auto floatVec = featureObj.GetFeatures();
 				features.insert(features.end(), floatVec.begin(), floatVec.end());
 			}
+			uint32_t setSize = features.size() / featuresSeries.size();
+			features.resize(setSize * timeSteps_);
 			bp::object arrayObj;
 			if (layered_) {
-				arrayObj = ConvertLayeredSeqFeatureVector(features, featuresSeries.size());
+				arrayObj = ConvertLayeredSeqFeatureVector(features, timeSteps_);
 			} else {
-				arrayObj = ConvertSeqFeatureVector(features, featuresSeries.size());
+				arrayObj = ConvertSeqFeatureVector(features, timeSteps_);
 			}
 			bp::object res = bp::call_method<bp::object>(obj_.ptr(), "predict", arrayObj);
 			auto np_ret = reinterpret_cast<PyArrayObject*>(res.ptr());
@@ -124,6 +130,7 @@ private:
 	const std::string modelName_;
 	bp::object obj_;
 	bool layered_ = false;
+	uint32_t timeSteps_ = 8;
 };
 
 void Init(int argc, char** argv) {

@@ -19,32 +19,39 @@ struct MCNode {
 	Card move_;
 	std::array<shared_ptr<MCNode>, 32> childs_ = {{nullptr}};
 	shared_ptr<LayoutSampler> sampler_;
+	array<shared_ptr<FeaturesSet>, 3> features_;
+	MCNode* parent_ = nullptr;
+	uint32_t curPlayer = 0;
 };
 
 class MonteCarloPlayer : public IPlayer {
 public:
-	MonteCarloPlayer(vector<shared_ptr<IPlayer>> simulationPlayers, const string& evalModelFileName, bool useTreeSearch)
+	MonteCarloPlayer(vector<shared_ptr<IPlayer>> simulationPlayers, shared_ptr<IModel> posGenerator, bool useTreeSearch)
 		: players_(simulationPlayers)
 		, useTreeSearch_(useTreeSearch)
+		, posProbGenerator_(posGenerator)
 	{
 	}
 
-	virtual void OnNewLayout(const GameState& game) {
+	void OnNewLayout(const GameState& game) override {
 		stateView_ = game;
+		std::fill(features_.begin(), features_.end(), vector<FeaturesSet>());
 		first_ = game.GetFirstPlayer();
 	}
 
-	virtual void OnNewXRayLayout(const GameState& game) {
+	void OnNewXRayLayout(const GameState& game) override {
 		xray_.reset(new GameState(game));
 	}
 
-	virtual void OnMove(Card card) {
+	void OnMove(Card card) override {
+		features_[stateView_.GetCurPlayer()].push_back(CalcFeatures(stateView_, card, ourHero_, FT_PosPredict));
 		stateView_.MakeMove(card);
 		if (xray_.get()) {
 			xray_->MakeMove(card);
 		}
 	}
-	virtual Card DoMove(float* moveValue) {
+
+	Card DoMove(float* moveValue) override {
 		ourHero_ = stateView_.GetCurPlayer();
 		Card result;
 		if (!useTreeSearch_) {
@@ -55,14 +62,13 @@ public:
 		cerr << "OK!" << endl;
 		return result;
 	}
-	virtual shared_ptr<IPlayer> Clone() {
+
+	shared_ptr<IPlayer> Clone() override {
 		new shared_ptr<IPlayer>(new MonteCarloPlayer(*this));
 	}
-	virtual const GameState& GetStateView() const {
-		return stateView_;
-	}
-	virtual void GetCardProbabilities(CardsProbabilities& res) {
 
+	const GameState& GetStateView() const override {
+		return stateView_;
 	}
 
 private:
@@ -73,8 +79,20 @@ private:
 		game = mgr.GetState();
 	}
 
+	CardsProbabilities GenerateProbsArray(const array<vector<FeaturesSet>, 3>& features) {
+		CardsProbabilities probs;
+		for (uint32_t player = 0; player < 3; ++player) {
+			if (player != ourHero_) {
+				auto predicted = posProbGenerator_->PredictSeq(features[player]);
+				std::copy(predicted.begin(), predicted.end(), probs[player].begin());
+			}
+		}
+		return probs;
+	}
+
 	Card RunNoSearch(const GameState& state, uint32_t numOfSimulations, float* moveValue) {
-		LayoutSampler sampler(state, first_, ourHero_);
+		auto probs = GenerateProbsArray(features_);
+		LayoutSampler sampler(state, first_, ourHero_, probs);
 		map<Card, float> stats;
 		for (uint32_t i = 0; i < numOfSimulations; ++i) {
 			vector<GameState> state = sampler.DoSample(1, /*playMoveHistory*/true);
@@ -131,8 +149,19 @@ private:
 			return;
 		}
 		// leaf node
-		bool leaf = node->childs_.size() == 0;
+		bool leaf = node->n_ == 1;
 		if (node->sampler_.get() == nullptr) {
+			array<vector<FeaturesSet>, 3> features = features_;
+			MCNode* current = node.get();
+			while (current != nullptr) {
+				for (uint32_t player = 0; player < 3; ++player) {
+					if (current->features_[player].get()) {
+						features[player].push_back(*current->features_[player].get());
+					}
+				}
+				current = current->parent_;
+			}
+			auto probs = GenerateProbsArray(features);
 			node->sampler_.reset(new LayoutSampler(game, first_, ourHero_));
 		}
 		vector<GameState> sample = node->sampler_->DoSample(1, true);
@@ -142,6 +171,7 @@ private:
 			auto child = node->childs_[bit];
 			if (child == nullptr) {
 				child.reset(new MCNode());
+				child->parent_ = node.get();
 				node->childs_[bit] = child;
 				child->move_ = card;
 				child->n_ = 1;
@@ -166,6 +196,9 @@ private:
 			sample[0].MakeMove(bestChild->move_);
 			PlayToTheEnd(sample[0]);
 		} else {
+			if (bestChild->features_[game.GetCurPlayer()] == nullptr) {
+				bestChild->features_[game.GetCurPlayer()] = shared_ptr<FeaturesSet>(new FeaturesSet(CalcFeatures(game, bestChild->move_, ourHero_, FT_PosPredict)));
+			}
 			game.MakeMove(bestChild->move_);
 			DoSearch(bestChild, game);
 		}
@@ -175,10 +208,11 @@ private:
 
 private:
 	vector<shared_ptr<IPlayer>> players_;
-	//ModelPredictor evaluator_;
+	shared_ptr<IModel> posProbGenerator_;
 	GameState stateView_;
 	shared_ptr<GameState> xray_;
 	uint32_t ourHero_ = 0;
 	uint32_t first_ = 0;
 	bool useTreeSearch_ = false;
+	array<vector<FeaturesSet>, 3> features_;
 };
