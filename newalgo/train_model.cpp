@@ -1,5 +1,6 @@
 #include "train_model.h"
 #include "features.h"
+#include "utils.h"
 
 using namespace std;
 
@@ -15,133 +16,81 @@ static float sigmoid(float x) {
 	return 1.0 / (1.0 + exp(-x));
 }
 
-/*class NN3LayerModel : public IModel {
+class SingleLayerPerceptron : public IModel {
 public:
-	NN3LayerModel(istream& ist, vector<FeatureTag> validTags) {
-		ist >> input_ >> hidden1_ >> hidden2_ >> output_;
-		weights1_ = readFloatVec(ist, input_ * hidden1_);
-		biases1_ = readFloatVec(ist, hidden1_);
-		weights2_ = readFloatVec(ist, hidden1_ * hidden2_);
-		biases2_ = readFloatVec(ist, hidden2_);
-		weights3_ = readFloatVec(ist, hidden2_ * output_);
-
-		FeaturesRegistry registry;
-		array<bool, FeatureTag::FT_TypeCount> validTypes = { { false } };
-		for (auto tag : validTags) {
-			validTypes[tag] = true;
+	SingleLayerPerceptron(const std::string& fileName) {
+		ifstream ist(fileName);
+		ist >> w_ >> h_;
+		weights_.resize(w_ * h_);
+		bias_.resize(h_);
+		for (uint32_t i = 0; i < w_ * h_; i++) {
+			ist >> weights_[i];
 		}
-		auto featureSet = registry.CreateEmptySet().GetFeatures();
-		featureMap_.resize(featureSet.size());
-		uint32_t counter = 0;
-		for (uint32_t i = 0; i < featureSet.size(); ++i) {
-			featureMap_[i] = validTypes[featureSet[i].tag_] ? counter++ : InvalidIndex;
+		for (uint32_t i = 0; i < h_; i++) {
+			ist >> bias_[i];
 		}
-		PREF_ASSERT((input_ == counter) && "Invalid number of features in model");
 	}
 
-	virtual vector<float> Predict(const FeaturesSet& features) {
-		vector<float> result(output_);
-		vector<float> hidden1 = biases1_;
-		vector<float> hidden2 = biases2_;
-		for (const auto& feature : features.GetNonZeroFeatures()) {
-			for (uint32_t j = 0; j < hidden1_; j++) {
-				if (featureMap_[feature.first] != InvalidIndex) {
-					hidden1[j] += weights1_[featureMap_[feature.first] * input_ + j] * feature.second;
-				}
-				hidden1[j] = sigmoid(hidden1[j]);
-			}
-		}
-
-		for (uint32_t i = 0; i < hidden2_; i++) {
-			for (uint32_t j = 0; j < hidden1_; j++) {
-				hidden2[i] += weights2_[i * hidden2_ + j] * hidden1[j];
-			}
-			hidden2[i] = sigmoid(hidden2[i]);
-		}
-
-		for (uint32_t i = 0; i < hidden2_; i++) {
-			for (uint32_t j = 0; j < output_; j++) {
-				result[i] += weights3_[i * output_ + j] * hidden2[j];
+	vector<float> Predict(const FeaturesSet& features) override {
+		vector<float> result = bias_;
+		for (const auto pair : features.GetNonZeroFeatures()) {
+			uint32_t beg = pair.first * h_;
+			for (uint32_t i = 0; i < h_; i++) {
+				result[i] += pair.second * weights_[beg + i];
 			}
 		}
 		return result;
 	}
 
-private:
-	vector<float> weights1_;
-	vector<float> weights2_;
-	vector<float> weights3_;
-	vector<float> biases1_;
-	vector<float> biases2_;
-	vector<int> featureMap_;
-	int input_ = 0;
-	int hidden1_ = 0;
-	int hidden2_ = 0;
-	int output_ = 0;
-};
-
-class NN2LayerModel : public IModel {
-public:
-	NN2LayerModel(istream& ist, vector<FeatureTag> validTags) {
-		ist >> input_ >> hidden1_ >> output_;
-		biases1_ = readFloatVec(ist, hidden1_);
-		weights1_ = readFloatVec(ist, input_ * hidden1_);
-		weights2_ = readFloatVec(ist, hidden1_ * output_);
-
-		FeaturesRegistry registry;
-		array<bool, FeatureTag::FT_TypeCount> validTypes = { { false } };
-		for (auto tag : validTags) {
-			validTypes[tag] = true;
-		}
-		auto featureSet = registry.CreateEmptySet().GetFeatures();
-		featureMap_.resize(featureSet.size());
-		uint32_t counter = 0;
-		for (uint32_t i = 0; i < featureSet.size(); ++i) {
-			featureMap_[i] = validTypes[featureSet[i].tag_] ? counter++ : InvalidIndex;
-		}
-		PREF_ASSERT((input_ == counter) && "Invalid number of features in model");
-	}
-
-	virtual vector<float> Predict(const FeaturesSet& features) {
-		vector<float> result(output_);
-		vector<float> hidden1 = biases1_;
-		for (const auto& feature : features.GetNonZeroFeatures()) {
-			for (uint32_t j = 0; j < hidden1_; j++) {
-				if (featureMap_[feature.first] != InvalidIndex) {
-					hidden1[j] += weights1_[featureMap_[feature.first] * hidden1_ + j] * feature.second;
-				}
-			}
-		}
-		for (uint32_t  j = 0; j < hidden1_; j++) {
-			hidden1[j] = sigmoid(hidden1[j]);
-		}
-		for (uint32_t i = 0; i < output_; i++) {
-			for (uint32_t j = 0; j < hidden1_; j++) {
-				result[i] += weights2_[i * output_ + j] * hidden1[j];
-			}
-		}
-
-		return result;
+	vector<float> PredictSeq(const vector<FeaturesSet>& features) override {
+		PREF_ASSERT(false);
+		return vector<float>();
 	}
 
 private:
-	vector<float> weights1_;
-	vector<float> weights2_;
-	vector<float> biases1_;
-	vector<int> featureMap_;
-	int input_ = 0;
-	int hidden1_ = 0;
-	int output_ = 0;
-};*/
+	uint32_t w_ = 0;
+	uint32_t h_ = 0;
+	vector<float> bias_;
+	vector<float> weights_;
+};
 
-
-class ModelFactory {
+class NativeModelFactory : public IModelFactory {
 public:
-	static shared_ptr<IModel> CreateModel(const std::string& model_name, istream& ist) {
-		PREF_ASSERT(false && "Unknown model name");
-		return shared_ptr<IModel>(nullptr);
+	shared_ptr<IModel> CreateModel(const std::string& modelName) override {
+		if (modelName == "model2") {
+			return shared_ptr<IModel>(new SingleLayerPerceptron(modelName + ".txt"));
+		}
+		PREF_ASSERT(false);
+		return nullptr;
 	}
 };
+
+class PrefixModelFactory : public IModelFactory {
+public:
+	PrefixModelFactory(const vector<pair<string, shared_ptr<IModelFactory>>>& models) {
+		for (auto pair : models) {
+			map_[pair.first] = pair.second;
+		}
+	}
+
+	shared_ptr<IModel> CreateModel(const std::string& modelName) override {
+		auto parts = utils::split(modelName, ':');
+		PREF_ASSERT(parts.size() > 1);
+		return map_.at(parts[0])->CreateModel(modelName.substr(parts[0].size() + 1, modelName.size() - parts[0].size() - 1));
+	}
+
+private:
+	map<string, shared_ptr<IModelFactory>> map_;
+};
+
+shared_ptr<IModelFactory> CreateNativeModelFactory() {
+	return shared_ptr<IModelFactory>(new NativeModelFactory());
+}
+
+shared_ptr<IModelFactory> CreatePrefixModelFactory(vector<pair<string, shared_ptr<IModelFactory>>> models) {
+	return shared_ptr<IModelFactory>(new PrefixModelFactory(models));
+}
+
 
 static vector<float> parseNumbersFromString(const string& str) {
 	stringstream sstr(str);
@@ -164,47 +113,5 @@ StateContext::StateContext(const GameState& playerView, Card move, uint32_t ourH
 	, move_(move)
 	, features_(CalcFeatures(playerView, move, ourHero, tag))
 {
-}
-
-ModelPredictor::ModelPredictor(const string& weightsFilePath)
-{
-	string str;
-	ifstream ist(weightsFilePath);
-	string modelName;
-	ist >> modelName;
-	model_ = ModelFactory::CreateModel(modelName, ist);
-}
-
-vector<float> ModelPredictor::CalcWeights(StateContext& ctx) {
-	return model_->Predict(ctx.GetFeatures());
-}
-
-uint32_t ModelPredictor::PredictLabelUT(const FeaturesSet& features) {
-	vector<float> weights = model_->Predict(features);
-	auto it = std::max_element(weights.begin(), weights.end());
-	return it - weights.begin();
-}
-
-vector<float> ModelPredictor::CalcWeights(FeaturesSet& features) {
-	return model_->Predict(features);
-}
-
-uint32_t ModelPredictor::PredictLabel(StateContext& ctx) {
-	auto weights = CalcWeights(ctx);
-	auto it = std::max_element(weights.begin(), weights.end());
-	return it - weights.begin();
-}
-
-vector<float> ModelPredictor::PredictProbabilities(StateContext& ctx) {
-	auto weights = CalcWeights(ctx);
-	float sum = 0.0f;
-	for (float& w : weights) {
-		w = exp(w);
-		sum += w;
-	}
-	for (float& w : weights) {
-		w /= sum;
-	}
-	return weights;
 }
 

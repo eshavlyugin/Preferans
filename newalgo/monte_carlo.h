@@ -30,6 +30,7 @@ public:
 		: players_(simulationPlayers)
 		, useTreeSearch_(useTreeSearch)
 		, posProbGenerator_(posGenerator)
+		, useLstm_(false)
 	{
 	}
 
@@ -57,7 +58,7 @@ public:
 		if (!useTreeSearch_) {
 			result = RunNoSearch(IsCardsOpen() ? *xray_.get() : stateView_, 2000, moveValue);
 		} else {
-			result = RunForNSimulations(IsCardsOpen() ? *xray_.get() : stateView_, 2000);
+			result = RunForNSimulations(IsCardsOpen() ? *xray_.get() : stateView_, 500);
 		}
 		cerr << "OK!" << endl;
 		return result;
@@ -103,10 +104,10 @@ private:
 				stats[move] -= stateCopy.GetScores()[ourHero_];
 			}
 		}
-		for (auto it = stats.begin(); it != stats.end(); ++it) {
+		/*for (auto it = stats.begin(); it != stats.end(); ++it) {
 			cerr << CardToString(it->first) << " " << it->second << endl;
 		}
-		state.Dump(cerr);
+		state.Dump(cerr);*/
 		auto res = std::max_element(stats.begin(), stats.end(), [](auto pair1, auto pair2) {
 			return pair1.second < pair2.second;
 		});
@@ -130,11 +131,11 @@ private:
 		vector<shared_ptr<MCNode>> notNull;
 		for (auto elem : root->childs_) {
 			if (elem != nullptr) {
-				cerr << CardToString(elem->move_) << " " << elem->n_ << " " << elem->sum_ << endl;
+				//cerr << CardToString(elem->move_) << " " << elem->n_ << " " << elem->sum_ << endl;
 				notNull.push_back(elem);
 			}
 		}
-		state.Dump(cerr);
+//		state.Dump(cerr);
 		return (*(std::max_element(notNull.begin(), notNull.end(), [](auto child1, auto child2) {
 			return child1->sum_ * child2->n_ < child2->sum_ * child1->n_;
 		})))->move_;
@@ -162,7 +163,7 @@ private:
 				current = current->parent_;
 			}
 			auto probs = GenerateProbsArray(features);
-			node->sampler_.reset(new LayoutSampler(game, first_, ourHero_));
+			node->sampler_.reset(new LayoutSampler(game, first_, ourHero_, probs));
 		}
 		vector<GameState> sample = node->sampler_->DoSample(1, true);
 		uint32_t total = 0;
@@ -215,4 +216,5 @@ private:
 	uint32_t first_ = 0;
 	bool useTreeSearch_ = false;
 	array<vector<FeaturesSet>, 3> features_;
+	bool useLstm_ = false;
 };

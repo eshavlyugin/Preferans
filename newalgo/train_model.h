@@ -53,17 +53,6 @@ public:
 	virtual shared_ptr<IModel> CreateModel(const std::string& modelName) = 0;
 };
 
-class ModelPredictor {
-public:
-	ModelPredictor(const string& weightsFilePath);
-
-	uint32_t PredictLabel(StateContext& ctx);
-	uint32_t PredictLabelUT(const FeaturesSet& features);
-	vector<float> PredictProbabilities(StateContext& ctx);
-	vector<float> CalcWeights(StateContext& ctx);
-	vector<float> CalcWeights(FeaturesSet& features);
-
-private:
-	shared_ptr<IModel> model_;
-};
+shared_ptr<IModelFactory> CreateNativeModelFactory();
+shared_ptr<IModelFactory> CreatePrefixModelFactory(vector<pair<string, shared_ptr<IModelFactory>>> models);
 

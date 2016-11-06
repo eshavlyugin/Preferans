@@ -11,6 +11,7 @@ namespace po = boost::program_options;
 
 void PlayLoop(const vector<std::shared_ptr<IPlayer>>& players, array<int, 3>& scores, bool dump, bool openCards, shared_ptr<ostream> recordFile) {
 	GameState state = GenLayout();
+	GameState stateCopy = GenLayout();
 	GameManager manager(players);
 	manager.SetNewLayout(state, openCards);
 	manager.SetDumpGames(dump);
@@ -30,6 +31,7 @@ void PlayLoop(const vector<std::shared_ptr<IPlayer>>& players, array<int, 3>& sc
 	    *recordFile.get() << "\n";
 	    recordFile->flush();
 	}
+	stateCopy.Dump(cerr);
 }
 
 void PlayGames(const po::variables_map& opt) {
@@ -38,11 +40,13 @@ void PlayGames(const po::variables_map& opt) {
 	string player3 = opt["play3"].as<string>();
 	bool dump = player1 == "human" || player2 == "human" || player3 == "human";
 	int numGames = opt["num-games"].as<int>();
-	auto factory = shared_ptr<IModelFactory>(new PyModels::PyModelFactory());
+	shared_ptr<IModelFactory> pyFactory(new PyModels::PyModelFactory());
+	auto nativeFactory = CreateNativeModelFactory();
+	auto compositeFactory = CreatePrefixModelFactory({make_pair(string("py"), pyFactory), make_pair(string("native"), nativeFactory)});
 	std::vector<std::shared_ptr<IPlayer>> players;
-	players.push_back(CreatePlayer(player1, factory));
-	players.push_back(CreatePlayer(player2, factory));
-	players.push_back(CreatePlayer(player3, factory));
+	players.push_back(CreatePlayer(player1, compositeFactory));
+	players.push_back(CreatePlayer(player2, compositeFactory));
+	players.push_back(CreatePlayer(player3, compositeFactory));
 	array<int, 3> scores = {{0}};
 	string recordFile = opt["record-games-to-file"].as<string>();
 	shared_ptr<ostream> recordFileStream;
@@ -52,6 +56,7 @@ void PlayGames(const po::variables_map& opt) {
 	bool openCards = opt.count("open-cards");
 	for (int i = 0; i < numGames; i++) {
 		PlayLoop(players, scores, dump, openCards, recordFileStream);
+		cerr << "Scores: " << scores[0] << ", " << scores[1] << ", " << scores[2] << endl;
 	}
 	cerr << "Simulation finished" << endl;
 	cerr << "Scores: " << scores[0] << ", " << scores[1] << ", " << scores[2] << endl;
@@ -60,8 +65,10 @@ void PlayGames(const po::variables_map& opt) {
 int main(int argc, char* argv[]) {
 	srand(time(nullptr));
 	PyModels::Init(argc, argv);
-	auto factory = new PyModels::PyModelFactory();
-	auto model = factory->CreateModel("model_lstm");
+	shared_ptr<IModelFactory> pyFactory(new PyModels::PyModelFactory());
+	auto nativeFactory = CreateNativeModelFactory();
+	auto compositeFactory = CreatePrefixModelFactory({make_pair(string("py"), pyFactory), make_pair(string("native"), nativeFactory)});
+	auto model = compositeFactory->CreateModel("py:model_lstm");
 	model->PredictSeq(vector<FeaturesSet>(8, CalcFeatures(GameState(), NoCard, 0, FT_PosPredict)));
 	po::options_description desc("Allowed options");
 	const std::string formatDescr = "(format movePredictorsFolder:playingProbabilityPredFolder:trainingProbabilityPredFolder. In case we don't have prob folder for any of the components use random instead)";

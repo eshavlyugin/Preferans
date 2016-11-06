@@ -292,9 +292,9 @@ std::shared_ptr<IPlayer> CreatePlayer(const std::string& descr, std::shared_ptr<
 	} else if (descr == "monte_carlo" || descr == "monte_carlo2") {
 		vector<shared_ptr<IPlayer>> players;
 		for (uint32_t i = 0; i < 3; i++) {
-			players.push_back(CreatePlayer("random", modelFactory));
+			players.push_back(CreatePlayer("native:model2", modelFactory));
 		}
-		return std::shared_ptr<IPlayer>(new MonteCarloPlayer(players, modelFactory->CreateModel("model_lstm"), descr == "monte_carlo"));
+		return std::shared_ptr<IPlayer>(new MonteCarloPlayer(players, modelFactory->CreateModel("py:model_lstm"), descr == "monte_carlo"));
 	} else {
 		vector<string> playerParts = utils::split(descr, ',');
 		vector<pair<shared_ptr<IPlayer>, float>> players;
