@@ -4,18 +4,6 @@
 
 using namespace std;
 
-static vector<float> readFloatVec(istream& ist, int elems) {
-	vector<float> result(elems);
-	for (auto& elem : result) {
-		ist >> elem;
-	}
-	return result;
-}
-
-static float sigmoid(float x) {
-	return 1.0 / (1.0 + exp(-x));
-}
-
 class SingleLayerPerceptron : public IModel {
 public:
 	SingleLayerPerceptron(const std::string& fileName) {
@@ -89,19 +77,6 @@ shared_ptr<IModelFactory> CreateNativeModelFactory() {
 
 shared_ptr<IModelFactory> CreatePrefixModelFactory(vector<pair<string, shared_ptr<IModelFactory>>> models) {
 	return shared_ptr<IModelFactory>(new PrefixModelFactory(models));
-}
-
-
-static vector<float> parseNumbersFromString(const string& str) {
-	stringstream sstr(str);
-	vector<float> result;
-	int totalRead = 0;
-	while (sstr.good()) {
-		float value;
-		sstr >> value;
-		result.push_back(value);
-	}
-	return result;
 }
 
 const FeaturesSet& StateContext::GetFeatures() const {

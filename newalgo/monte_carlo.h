@@ -56,11 +56,10 @@ public:
 		ourHero_ = stateView_.GetCurPlayer();
 		Card result;
 		if (!useTreeSearch_) {
-			result = RunNoSearch(IsCardsOpen() ? *xray_.get() : stateView_, 2000, moveValue);
+			result = RunNoSearch(IsCardsOpen() ? *xray_.get() : stateView_, 500, moveValue);
 		} else {
-			result = RunForNSimulations(IsCardsOpen() ? *xray_.get() : stateView_, 500);
+			result = RunForNSimulations(IsCardsOpen() ? *xray_.get() : stateView_, 2000);
 		}
-		cerr << "OK!" << endl;
 		return result;
 	}
 
@@ -91,12 +90,20 @@ private:
 		return probs;
 	}
 
+	shared_ptr<LayoutSampler> CreateLayoutSampler(const GameState& state, const array<vector<FeaturesSet>, 3>& features) {
+		if (posProbGenerator_.get()) {
+			auto probs = GenerateProbsArray(features);
+			return shared_ptr<LayoutSampler>(new LayoutSampler(state, first_, ourHero_, probs));
+		} else {
+			return shared_ptr<LayoutSampler>(new LayoutSampler(state, first_, ourHero_));
+		}
+	}
+
 	Card RunNoSearch(const GameState& state, uint32_t numOfSimulations, float* moveValue) {
-		auto probs = GenerateProbsArray(features_);
-		LayoutSampler sampler(state, first_, ourHero_, probs);
+		shared_ptr<LayoutSampler> sampler = CreateLayoutSampler(state, features_);
 		map<Card, float> stats;
 		for (uint32_t i = 0; i < numOfSimulations; ++i) {
-			vector<GameState> state = sampler.DoSample(1, /*playMoveHistory*/true);
+			vector<GameState> state = sampler->DoSample(1, /*playMoveHistory*/true);
 			for (Card move : state[0].GenValidMoves()) {
 				GameState stateCopy = state[0];
 				stateCopy.MakeMove(move);
@@ -162,8 +169,7 @@ private:
 				}
 				current = current->parent_;
 			}
-			auto probs = GenerateProbsArray(features);
-			node->sampler_.reset(new LayoutSampler(game, first_, ourHero_, probs));
+			node->sampler_ = CreateLayoutSampler(game, features);
 		}
 		vector<GameState> sample = node->sampler_->DoSample(1, true);
 		uint32_t total = 0;

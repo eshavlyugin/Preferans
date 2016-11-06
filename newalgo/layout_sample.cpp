@@ -4,6 +4,7 @@ LayoutSampler::LayoutSampler(const GameState& state, uint32_t firstPlayer, uint3
 	: first_(firstPlayer)
 	, trump_(state.GetTrump())
 	, state_(state)
+	, ourHero_(ourHero)
 {
 	for (uint32_t i = 0; i < 3; ++i) {
 		std::fill(probArray_[i].begin(), probArray_[i].end(), 1.0f);
