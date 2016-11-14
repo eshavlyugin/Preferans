@@ -4,17 +4,24 @@ from pref_utils import readgames, print_data
 from collections import Counter
 from keras.models import model_from_json
 from keras.utils import np_utils
+from keras.preprocessing.sequence import pad_sequences
+
+import json
 
 import tensorflow as tf
 tf.python.control_flow_ops = tf
 
 batch_size = 32
-model_name = "model2"
+model_name = "model_lstm"
 model_type = "lstm" if model_name == "model_lstm" else "move"
-(data, labels, states) = readgames('game_rec9.txt', min_weight = 0.08, type = model_type)
+(data, labels, states) = readgames('game_rec9.txt', min_weight = 0.08, type = model_type, max_move_number = 7)
 
-model = model_from_json(open(model_name + ".json", "r").read())
+json_model = json.loads(open(model_name + ".json", "r").read())
+model = model_from_json(json_model["model"])
 model.load_weights(model_name + ".h5")
+if model_type == "lstm":
+	data = pad_sequences(np.array(data))
+
 if model_type == "move":
 	labels = np_utils.to_categorical(labels)
 	model.compile(loss='categorical_crossentropy',
